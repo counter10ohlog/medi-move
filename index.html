@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#13795b">
+<title>메디포스트 재고이동</title>
+<style>
+  :root { --bg:#f3f5f4; --card:#fff; --ink:#17201b; --mute:#5d6a63; --line:#d9e0dc; --go:#13795b; --go-soft:#e3f3ec;
+          --amber:#8a5300; --amber-soft:#fff3dc; --red:#b42318; --red-soft:#fde8e6; --blue:#1d4ed8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.45 -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  .wrap { max-width:520px; margin:0 auto; padding:12px 14px 40px; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:4px 2px 10px; }
+  .loc { font-size:34px; font-weight:800; letter-spacing:.5px; }
+  .loc small { font-size:16px; font-weight:600; color:var(--mute); margin-left:6px; }
+  .who { font-size:14px; color:var(--mute); text-align:right; }
+  .who a { color:var(--blue); }
+  #banner { position:sticky; top:0; z-index:5; background:var(--amber-soft); color:var(--amber); font-weight:700; font-size:15px; padding:10px 14px; border-bottom:1px solid #ecd29a; }
+  #banner.hide { display:none; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:10px 0; }
+  .card h3 { margin:0 0 6px; font-size:15px; color:var(--mute); font-weight:700; }
+  .item { padding:6px 0; border-top:1px solid var(--line); }
+  .item:first-of-type { border-top:0; }
+  .item b { font-size:18px; }
+  .sub { color:var(--mute); font-size:14px; }
+  .big { display:block; width:100%; min-height:58px; margin:10px 0; padding:12px 14px; border-radius:14px; border:2px solid var(--go);
+         background:var(--go); color:#fff; font-size:19px; font-weight:800; text-align:left; }
+  .big.alt { background:var(--card); color:var(--go); }
+  button.small { min-height:40px; padding:6px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:15px; color:var(--ink); }
+  .step { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .step button { width:58px; height:58px; border-radius:14px; border:1px solid var(--line); background:var(--card); font-size:28px; font-weight:700; color:var(--ink); }
+  .step input { width:100px; height:58px; text-align:center; font-size:28px; font-weight:800; border:2px solid var(--line); border-radius:14px; color:var(--ink); }
+  input[type=text], input[type=number], input[type=password], select { width:100%; height:52px; font-size:19px; padding:6px 10px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); }
+  label.chk { display:flex; gap:10px; align-items:center; padding:12px; border:2px solid var(--line); border-radius:12px; margin:10px 0; font-weight:700; }
+  label.chk input { width:26px; height:26px; }
+  label.chk.on { border-color:var(--red); background:var(--red-soft); color:var(--red); }
+  .cand { display:block; width:100%; text-align:left; padding:10px 12px; margin:8px 0; border:2px solid var(--line); border-radius:12px; background:#fff; font-size:16px; color:var(--ink); }
+  .cand.sel { border-color:var(--go); background:var(--go-soft); }
+  .tag { display:inline-block; font-size:12px; font-weight:800; padding:1px 7px; border-radius:20px; background:var(--go); color:#fff; margin-left:6px; }
+  .tag.warn { background:var(--amber); }
+  .tag.wait { background:#6b7280; }
+  .tag.bad { background:var(--red); }
+  .sum { background:var(--go-soft); color:var(--go); border-radius:12px; padding:10px 12px; font-weight:800; margin:10px 0; }
+  .warn { background:var(--amber-soft); color:var(--amber); border-radius:12px; padding:10px 12px; margin:10px 0; font-size:15px; }
+  .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 12px; margin:10px 0; font-weight:700; }
+  .ok { background:var(--go-soft); color:var(--go); border-radius:12px; padding:12px; margin:10px 0; font-weight:800; font-size:18px; }
+  .muted { color:var(--mute); font-size:14px; }
+  .rec { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:15px; }
+  .rec:first-of-type { border-top:0; }
+  .rec.cx { color:var(--mute); text-decoration:line-through; }
+  .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .grid4 button { height:52px; font-size:20px; font-weight:800; border-radius:12px; border:2px solid var(--line); background:#fff; color:var(--ink); }
+  .grid4 button.sel { border-color:var(--go); background:var(--go-soft); color:var(--go); }
+  .foot { margin-top:24px; text-align:center; color:var(--mute); font-size:12px; }
+</style>
+</head>
+<body>
+<div id="banner" class="hide"></div>
+<div class="wrap" id="app"><p class="muted">불러오는 중…</p></div>
+
+<script src="config.js"></script>
+<script>
+/* 메디포스트 휴대폰 재고이동 (GitHub Pages) — 2026-11-06 Claude Code
+ * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
+ * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
+ * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
+var VERSION = '2026-11-06';
+var CFG = window.MEDI_MOVE_CONFIG || {};
+var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
+var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled' };
+function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
+function lsJson(k, d) { try { var v = JSON.parse(lsGet(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+
+var LOC0 = (function () { try { return new URLSearchParams(location.search).get('loc') || ''; } catch (e) { return ''; } })();
+var S = { data: lsJson(K.cache, null), fresh: false, loc: '', worker: lsGet(K.worker), pin: lsGet(K.pin), view: 'loc', form: null, msg: null };
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function n(v) { return Number(v || 0).toLocaleString('ko-KR'); }
+function $(id) { return document.getElementById(id); }
+function pad(x) { return (x < 10 ? '0' : '') + x; }
+function nowText(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function newId(d) { d = d || new Date(); return pad(d.getMonth() + 1) + pad(d.getDate()) + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + '-' + Math.random().toString(36).slice(2, 7).padEnd(5, '0'); }
+function uniq(a) { var o = []; a.forEach(function (x) { if (o.indexOf(x) < 0) o.push(x); }); return o; }
+
+function parseLoc(s) {
+  s = String(s || '').toUpperCase().replace(/\s/g, '');
+  var m = s.match(/^D2-([A-Z])(\d)-(\d{1,2})-00$/) || s.match(/^([A-Z])(\d)-(\d{1,2})$/);
+  if (!m) return null;
+  var bay = parseInt(m[3], 10), lv = parseInt(m[2], 10);
+  if (!(bay >= 1 && bay <= 99)) return null;
+  var b2 = (bay < 10 ? '0' : '') + bay;
+  return { short: m[1] + lv + '-' + b2, full: 'D2-' + m[1] + lv + '-' + b2 + '-00', row: m[1], level: lv, bay: bay };
+}
+function shortOf(full) { var p = parseLoc(full); return p ? p.short : full; }
+S.loc = (parseLoc(LOC0) || {}).short || '';
+
+// ---------------------------------------------------------------- 구글 웹앱 부르기
+// 구글 전달(리다이렉트)이 가끔 진짜 응답 대신 상태({ok, app})를 줄 때가 있어 kind를 보고 3번까지 다시 보냄 (dailylist와 같은 방식)
+function api(action, extra, keepalive) {
+  if (!CFG.apiUrl) return Promise.reject({ code: 'setup', message: 'config.js에 구글 웹앱 주소가 아직 없어요 (사무실에 알려 주세요)' });
+  var body = JSON.stringify(Object.assign({ action: action, pin: S.pin }, extra || {}));
+  var want = { phoneData: 'data', phoneSave: 'save', phoneCancel: 'cancel' }[action];
+  var attempt = 0;
+  function once() {
+    return fetch(CFG.apiUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, redirect: 'follow', keepalive: !!keepalive })
+      .then(function (r) { if (!r.ok) throw { code: 'network', message: 'HTTP ' + r.status }; return r.json(); }, function () { throw { code: 'network', message: '인터넷 연결을 확인해 주세요' }; })
+      .then(function (j) {
+        if (!j.ok) throw { code: j.error === 'pin' ? 'pin' : 'server', message: j.error || '오류' };
+        if (j.kind !== want) throw { code: 'network', message: '구글 응답이 이상해요' };
+        return j;
+      });
+  }
+  function loop() {
+    return once().catch(function (e) {
+      if (e.code !== 'network' || ++attempt >= 3) throw e;
+      return new Promise(function (r) { setTimeout(r, 600 * attempt); }).then(loop);
+    });
+  }
+  return loop();
+}
+function pinFail() {
+  S.pin = ''; lsSet(K.pin, null);
+  S.msg = { t: 'err', s: '현장 비밀번호가 맞지 않아요. 사무실에 물어보세요' }; S.view = 'who'; render();
+}
+
+// ---------------------------------------------------------------- 받은 자료
+function load() {
+  if (!S.worker || !S.pin) { S.view = 'who'; render(); return; }
+  api('phoneData').then(function (res) {
+    S.data = { at: nowText(), today: res.today, stockTime: res.stockTime, stock: res.stock, items: res.items, log: res.log };
+    S.fresh = true;
+    mergeOutbox();
+    lsSet(K.cache, JSON.stringify(S.data));
+    if (S.view === 'who') S.view = 'loc';
+    render(); flush();
+  }).catch(function (e) {
+    if (e.code === 'pin') return pinFail();
+    S.fresh = false;
+    if (!S.data) S.msg = { t: 'err', s: '처음 한 번은 인터넷이 되는 곳에서 열어 주세요. (' + e.message + ')' };
+    render();
+  });
+}
+
+// ---------------------------------------------------------------- 보관함 (아직 구글에 못 보낸 기록)
+var flushT = null, inflight = false, failStreak = 0;
+function outbox() { return lsJson(K.outbox, []); }
+function setOutbox(a) { lsSet(K.outbox, a.length ? JSON.stringify(a) : null); }
+function flush(keepalive) {
+  var box = outbox();
+  banner();
+  if (!box.length || inflight || !S.pin) return;
+  inflight = true; clearTimeout(flushT); flushT = null;
+  var ids = box.map(function (r) { return r.id; });
+  api('phoneSave', { recs: box }, keepalive).then(function (j) {
+    var gone = {};
+    j.saved.forEach(function (id) { gone[id] = 'ok'; });
+    j.bad.forEach(function (b) { gone[b.id] = b.error; });
+    setOutbox(outbox().filter(function (r) { return !gone[r.id]; }));   // 보내는 동안 새로 저장한 것은 남김
+    if (S.data) S.data.log.forEach(function (r) {
+      if (gone[r.id] === 'ok' && r.status === '보내는 중') r.status = '새로';
+      else if (gone[r.id] && gone[r.id] !== 'ok') { r.status = '안 들어감'; r.error = gone[r.id]; }
+    });
+    if (j.bad.length) S.msg = { t: 'err', s: '구글이 받지 않은 기록이 ' + j.bad.length + '건 있어요: ' + j.bad[0].error + ' — 다시 넣어 주세요' };
+    failStreak = 0; saveCache();
+  }).catch(function (e) {
+    if (e.code === 'pin') { pinFail(); return; }
+    failStreak++;
+    flushT = setTimeout(flush, Math.min(30000, 3000 * failStreak));   // 포기하지 않고 간격을 늘려 다시
+  }).then(function () {
+    inflight = false; banner(); if (S.view === 'loc' || S.view === 'choose') render();
+    if (outbox().length && !flushT && failStreak === 0) flushT = setTimeout(flush, 300);
+  });
+}
+function saveCache() { if (S.data) lsSet(K.cache, JSON.stringify(S.data)); }
+function banner() {
+  var c = outbox().length, b = $('banner');
+  if (!b) return;
+  if (!CFG.apiUrl) { b.textContent = '설정 전: config.js에 구글 웹앱 주소가 없어요'; b.className = ''; return; }
+  if (c) { b.textContent = '📶 아직 못 보낸 기록 ' + c + '건 — 휴대폰에 저장돼 있어요. 연결되면 자동으로 보내요'; b.className = ''; }
+  else if (S.data && !S.fresh) { b.textContent = '인터넷 없이 저장된 자료로 보고 있어요 (' + esc((S.data.at || '').slice(5, 16)) + ' 받음)'; b.className = ''; }
+  else { b.textContent = ''; b.className = 'hide'; }
+}
+window.addEventListener('online', function () { failStreak = 0; flush(); if (!S.fresh) load(); });
+window.addEventListener('pagehide', function () { flush(true); });
+document.addEventListener('visibilitychange', function () { if (document.hidden) flush(true); else { failStreak = 0; load(); } });
+
+// ---------------------------------------------------------------- 자료 계산
+function itemOf(code) {
+  var it = ((S.data && S.data.items) || []).filter(function (x) { return x.code === code; })[0];
+  return it || { code: code, name: code, per: 0 };
+}
+function stockAt(full) { return S.data.stock.filter(function (r) { return r.loc === full && (r.avail > 0 || r.stock > 0); }); }
+function liveLog() { return S.data.log.filter(function (r) { return r.status !== '취소' && r.status !== '안 들어감'; }); }
+function todayAt(full) { return S.data.log.filter(function (r) { return r.loc === full || r.from === full || r.to === full; }); }
+function usedFromToday() { var u = {}; liveLog().forEach(function (r) { if (r.kind === 'bulk') u[r.from] = true; }); return u; }
+// 1단 보충 후보: 같은 품목 2·3단 파레트, 유통기한 빠른 LOT → 덜 찬 파레트 → 자리 알파벳 (업무허브 refill_candidates와 같은 순서)
+function candidates(code, exceptFull) {
+  var used = usedFromToday(), byLoc = {};
+  S.data.stock.forEach(function (r) {
+    var p = parseLoc(r.loc);
+    if (r.code !== code || r.avail <= 0 || !p || p.level === 1 || r.loc === exceptFull) return;
+    var k = r.loc + '|' + r.lot;
+    if (!byLoc[k]) byLoc[k] = { loc: r.loc, lot: r.lot, exp: r.exp, avail: 0 };
+    byLoc[k].avail += r.avail;
+  });
+  var list = Object.keys(byLoc).map(function (k) { return byLoc[k]; });
+  list.sort(function (a, b) {
+    var x = a.exp || '9999', y = b.exp || '9999';
+    return x < y ? -1 : x > y ? 1 : a.lot < b.lot ? -1 : a.lot > b.lot ? 1 : a.avail - b.avail || (a.loc < b.loc ? -1 : 1);
+  });
+  list.forEach(function (c) { c.used = !!used[c.loc]; });
+  return list.filter(function (c) { return !c.used; }).concat(list.filter(function (c) { return c.used; }));
+}
+
+// ---------------------------------------------------------------- 화면
+function render() {
+  var h = '', p = parseLoc(S.loc);
+  h += '<div class="top"><div class="loc">' + (p ? esc(p.short) + '<small>' + p.level + '단</small>' : '재고이동 기록') + '</div>';
+  h += '<div class="who">' + (S.worker ? esc(S.worker) + ' · <a href="#" onclick="S.view=\'who\';S.msg=null;render();return false">바꾸기</a>' : '') + '</div></div>';
+  if (S.msg) h += '<div class="' + S.msg.t + '">' + esc(S.msg.s) + '</div>';
+  if (S.view === 'who') h += viewWho();
+  else if (!S.data) h += '<p class="muted">불러오는 중…</p>';
+  else if (S.view === 'pick') h += viewPick(p);
+  else if (S.view === 'refill') h += viewRefill(p);
+  else if (S.view === 'moveto') h += viewMoveTo(p);
+  else if (S.view === 'choose' || !p) h += viewChoose();
+  else h += viewLoc(p);
+  h += '<div class="foot">메디포스트 재고이동 · ' + VERSION + '</div>';
+  $('app').innerHTML = h;
+  if (S._lastView !== S.view) { S._lastView = S.view; window.scrollTo(0, 0); }
+  banner();
+}
+
+function viewWho() {
+  return '<div class="card"><h3>처음 한 번만 넣어요</h3>' +
+    '<p>이름</p><input type="text" id="wName" value="' + esc(S.worker) + '" placeholder="예: 홍길동">' +
+    '<p>현장 비밀번호 (사무실에 물어보기)</p><input type="password" inputmode="numeric" id="wPin" placeholder="••••">' +
+    '<button class="big" onclick="saveWho()">시작</button><div class="muted">이 휴대폰에만 저장돼요.</div></div>';
+}
+function saveWho() {
+  var w = $('wName').value.trim(), pin = $('wPin').value.trim();
+  if (!w) { S.msg = { t: 'err', s: '이름을 넣어 주세요' }; render(); return; }
+  if (!pin && !S.pin) { S.msg = { t: 'err', s: '현장 비밀번호를 넣어 주세요' }; render(); return; }
+  S.worker = w; lsSet(K.worker, w);
+  if (pin) { S.pin = pin; lsSet(K.pin, pin); }
+  S.msg = null; S.view = 'loc'; render(); load();
+}
+
+function stockCard(p) {
+  var rows = stockAt(p.full);
+  var h = '<div class="card"><h3>지금 이 자리' + (S.data.stockTime ? ' (재고 현황 ' + esc(String(S.data.stockTime).slice(5, 16).replace('T', ' ')) + ' 기준)' : '') + '</h3>';
+  if (!rows.length) h += '<div class="muted">재고 현황에는 빈 자리예요.</div>';
+  rows.forEach(function (r) {
+    var it = itemOf(r.code);
+    h += '<div class="item"><b>' + esc(r.name || it.name) + '</b> <span class="sub">' + esc(r.code) + '</span><br>' +
+      '<span class="sub">LOT ' + esc(r.lot) + ' · ' + esc(r.exp) + '</span><br>' + n(r.avail) + '개' +
+      (it.per ? ' <span class="sub">(약 ' + Math.ceil(r.avail / it.per) + '박스, 박스당 ' + it.per + ')</span>' : '') +
+      (r.stock !== r.avail ? ' <span class="sub">· 재고 ' + n(r.stock) + '</span>' : '') + '</div>';
+  });
+  return h + '</div>';
+}
+
+function recLine(r) {
+  var t = r.time ? String(r.time).slice(11, 16) : '';
+  var what = r.kind === 'pick'
+    ? shortOf(r.loc) + ' → Picking ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '') + (r.empty ? ' ★재고X' : '')
+    : shortOf(r.from) + ' → ' + shortOf(r.to) + ' 파레트';
+  var tag = r.status === '보내는 중' ? '<span class="tag wait">보내는 중</span>' : r.status === '가져감' ? '<span class="tag">사무실 가져감</span>'
+    : r.status === '안 들어감' ? '<span class="tag bad">안 들어감</span>' : '';
+  var can = (r.status === '새로' || r.status === '보내는 중') && r.worker === S.worker;
+  return '<div class="rec' + (r.status === '취소' || r.status === '안 들어감' ? ' cx' : '') + '"><div>' + esc(t) + ' ' + esc(r.name || r.code) + tag + '<br><span class="sub">' +
+    esc(what) + ' · ' + esc(r.worker) + (r.error ? ' · ' + esc(r.error) : '') + '</span></div>' +
+    (can ? '<button class="small" onclick="cancelRec(\'' + esc(r.id) + '\')">취소</button>' : '') + '</div>';
+}
+
+function viewLoc(p) {
+  var rows = stockAt(p.full);
+  var h = stockCard(p);
+  h += '<button class="big" onclick="startPick()">📦 Picking으로 꺼냈어요</button>';
+  h += '<button class="big alt" onclick="startRefill()">⬇ 2·3단 파레트를 여기로 내렸어요</button>';
+  if (rows.length) h += '<button class="big alt" onclick="startMoveTo()">➡ 이 자리 파레트를 다른 자리로 옮겼어요</button>';
+  var recs = todayAt(p.full);
+  if (recs.length) {
+    h += '<div class="card"><h3>오늘 이 자리 기록</h3>';
+    recs.forEach(function (r) { h += recLine(r); });
+    h += '</div>';
+  }
+  h += '<button class="small" onclick="S.view=\'choose\';S.msg=null;render()">다른 자리 고르기 · 오늘 내 기록</button>';
+  return h;
+}
+
+function productPicker(codes, sel) {
+  var list = codes.length ? codes.map(itemOf) : (S.data.items || []).slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+  if (codes.length === 1) return '<div class="item"><b>' + esc(list[0].name) + '</b> <span class="sub">' + esc(list[0].code) + '</span></div>';
+  var h = '<p class="sub">' + (codes.length ? '이 자리에 품목이 여러 개예요. 옮긴 품목을 골라 주세요' : '재고 현황에 없는 자리예요. 품목을 골라 주세요') + '</p>';
+  h += '<select id="fCode" onchange="S.form.code=this.value;render()"><option value="">— 품목 고르기 —</option>';
+  list.forEach(function (it) { h += '<option value="' + esc(it.code) + '"' + (it.code === sel ? ' selected' : '') + '>' + esc(it.name) + ' (' + esc(it.code) + ')</option>'; });
+  return h + '</select>';
+}
+
+// ---- Picking으로 꺼냄
+function startPick() {
+  var codes = uniq(stockAt(parseLoc(S.loc).full).map(function (r) { return r.code; }));
+  S.form = { kind: 'pick', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: 1, units: '', unitsOn: false, empty: false };
+  S.view = 'pick'; S.msg = null; render();
+}
+function viewPick(p) {
+  var f = S.form, it = f.code ? itemOf(f.code) : null;
+  S._avail = f.code ? stockAt(p.full).filter(function (r) { return r.code === f.code; }).reduce(function (a, r) { return a + r.avail; }, 0) : 0;
+  S._per = it ? it.per : 0;
+  var h = '<div class="card"><h3>📦 Picking으로 꺼냈어요</h3>' + productPicker(f.codes, f.code);
+  h += '<p>꺼낸 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
+    '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
+    '<button onclick="bump(1)">+</button><span>박스</span></div>';
+  h += '<label class="chk' + (f.empty ? ' on' : '') + '"><input type="checkbox" ' + (f.empty ? 'checked' : '') +
+    ' onchange="S.form.empty=this.checked;render()"> 이 자리가 비었어요 (재고X)</label>';
+  h += f.unitsOn
+    ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
+    : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
+  h += '<div id="fSum"></div></div>';
+  h += '<button class="big" onclick="savePick()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  setTimeout(sumUpd, 0);
+  return h;
+}
+function bump(d) { var v = parseInt(S.form.boxes || '0', 10) || 0; S.form.boxes = Math.max(0, v + d); $('fBoxes').value = S.form.boxes; sumUpd(); }
+function sumUpd() {
+  var f = S.form, el = $('fSum');
+  if (!el || !f) return;
+  var b = parseInt(f.boxes || '0', 10) || 0, u = parseInt(f.units || '0', 10) || 0, per = S._per, h = '';
+  if (u > 0) h = '<div class="sum">낱개 ' + n(u) + '개</div>';
+  else if (b > 0 && per) h = '<div class="sum">' + b + '박스 × ' + per + '개 = ' + n(b * per) + '개</div>';
+  else if (b > 0) h = '<div class="sum">' + b + '박스</div><div class="warn">박스당 수량을 몰라요. 사무실에서 개수를 맞춰요.</div>';
+  var q = u > 0 ? u : b * per;
+  if (f.empty && S._avail) h += '<div class="warn">재고X: 남은 ' + n(S._avail) + '개를 다 꺼낸 것으로 기록해요' +
+      (per && b && Math.ceil(S._avail / per) !== b ? ' (재고 현황으로는 ' + Math.ceil(S._avail / per) + '박스예요. 다시 세어 보기)' : '') + '</div>';
+  else if (!f.empty && S._avail && q > S._avail) h += '<div class="warn">재고 현황(' + n(S._avail) + '개)보다 많아요. 다 꺼냈으면 재고X를 눌러 주세요.</div>';
+  el.innerHTML = h;
+}
+function savePick() {
+  var f = S.form, p = parseLoc(S.loc);
+  var b = parseInt(f.boxes || '0', 10) || 0, u = parseInt(f.units || '0', 10) || 0;
+  if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
+  if (!f.empty && b <= 0 && u <= 0) { S.msg = { t: 'err', s: '박스 수를 넣어 주세요' }; render(); return; }
+  var q = u > 0 ? u : b * S._per;
+  if (!f.empty && S._avail && q > S._avail &&
+      !confirm('재고 현황(' + n(S._avail) + '개)보다 많아요 (' + n(q) + '개).\n다 꺼냈으면 [취소]를 누르고 재고X를 눌러 주세요.\n그래도 이대로 저장할까요?')) return;
+  send({ kind: 'pick', loc: p.full, code: f.code, name: itemOf(f.code).name, boxes: b, units: u, empty: !!f.empty });
+}
+
+// ---- 2·3단 파레트를 여기로 내림 (Bulk끼리)
+function startRefill() {
+  var p = parseLoc(S.loc);
+  var codes = uniq(stockAt(p.full).map(function (r) { return r.code; }));
+  liveLog().forEach(function (r) { if (r.kind === 'pick' && r.loc === p.full && r.empty && codes.indexOf(r.code) < 0) codes.push(r.code); });
+  S.form = { kind: 'bulk', codes: codes, code: codes.length === 1 ? codes[0] : '', from: '', typed: '' };
+  S.view = 'refill'; S.msg = null; render();
+}
+function viewRefill(p) {
+  var f = S.form;
+  var h = '<div class="card"><h3>⬇ 여기(' + esc(p.short) + ')로 파레트를 내렸어요</h3>' + productPicker(f.codes, f.code);
+  if (f.code) {
+    var c = candidates(f.code, p.full);
+    h += '<p>어느 자리 파레트를 내렸어요?</p>';
+    if (!c.length) h += '<div class="muted">재고 현황에 같은 품목 2·3단 파레트가 없어요. 아래에 자리를 직접 넣어 주세요.</div>';
+    c.forEach(function (x, i) {
+      h += '<button class="cand' + (f.from === x.loc ? ' sel' : '') + '" onclick="S.form.from=\'' + esc(x.loc) + '\';S.form.typed=\'\';render()">' +
+        '<b>' + esc(shortOf(x.loc)) + '</b> · ' + n(x.avail) + '개' + (i === 0 && !x.used ? '<span class="tag">추천</span>' : '') +
+        (x.used ? '<span class="tag warn">오늘 이미 옮김</span>' : '') + '<br><span class="sub">LOT ' + esc(x.lot) + ' · ' + esc(x.exp) + '</span></button>';
+    });
+    h += '<p class="sub">목록에 없으면 자리 직접 넣기 (예: M2-28)</p><input type="text" id="fTyped" value="' + esc(f.typed) +
+      '" oninput="S.form.typed=this.value.toUpperCase();S.form.from=\'\'" autocapitalize="characters" placeholder="M2-28">';
+  }
+  h += '</div><button class="big" onclick="saveRefill()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  return h;
+}
+function saveRefill() {
+  var f = S.form, p = parseLoc(S.loc);
+  if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
+  var src = f.from || (parseLoc(f.typed) || {}).full;
+  if (!src) { S.msg = { t: 'err', s: f.typed ? '자리 모양이 이상해요 (예: M2-28)' : '내린 파레트 자리를 골라 주세요' }; render(); return; }
+  if (src === p.full) { S.msg = { t: 'err', s: '같은 자리예요' }; render(); return; }
+  send({ kind: 'bulk', from: src, to: p.full, code: f.code, name: itemOf(f.code).name });
+}
+
+// ---- 이 자리 파레트를 다른 자리로
+function startMoveTo() {
+  var codes = uniq(stockAt(parseLoc(S.loc).full).map(function (r) { return r.code; }));
+  S.form = { kind: 'bulk', codes: codes, code: codes.length === 1 ? codes[0] : '', typed: '' };
+  S.view = 'moveto'; S.msg = null; render();
+}
+function viewMoveTo(p) {
+  var f = S.form;
+  return '<div class="card"><h3>➡ ' + esc(p.short) + ' 파레트를 다른 자리로 옮겼어요</h3>' + productPicker(f.codes, f.code) +
+    '<p>넣은 자리 (예: M1-15)</p><input type="text" id="fTo" value="' + esc(f.typed) +
+    '" oninput="S.form.typed=this.value.toUpperCase()" autocapitalize="characters" placeholder="M1-15"></div>' +
+    '<button class="big" onclick="saveMoveTo()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+}
+function saveMoveTo() {
+  var f = S.form, p = parseLoc(S.loc), to = parseLoc(f.typed);
+  if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
+  if (!to) { S.msg = { t: 'err', s: '넣은 자리 모양이 이상해요 (예: M1-15)' }; render(); return; }
+  if (to.full === p.full) { S.msg = { t: 'err', s: '같은 자리예요' }; render(); return; }
+  send({ kind: 'bulk', from: p.full, to: to.full, code: f.code, name: itemOf(f.code).name });
+}
+
+// ---- 저장: 휴대폰 보관함에 먼저 → 보내기
+function send(rec) {
+  var d = new Date();
+  rec.id = newId(d); rec.time = nowText(d); rec.worker = S.worker;
+  var box = outbox(); box.push(rec); setOutbox(box);
+  S.data.log.push(Object.assign({ date: rec.time.slice(0, 10), status: '보내는 중' }, rec));
+  saveCache();
+  S.msg = { t: 'ok', s: '✓ 저장했어요 (' + rec.time.slice(11, 16) + ')' + (navigator.onLine === false ? ' — 휴대폰에 저장, 연결되면 보내요' : '') };
+  S.view = 'loc'; S.form = null; render();
+  flush();
+}
+function cancelRec(id) {
+  if (!confirm('이 기록을 취소할까요?')) return;
+  var box = outbox();
+  if (box.some(function (r) { return r.id === id; })) {           // 아직 안 보낸 기록 → 휴대폰에서만 지움
+    setOutbox(box.filter(function (r) { return r.id !== id; }));
+    S.data.log.forEach(function (r) { if (r.id === id) r.status = '취소'; });
+    saveCache(); S.msg = { t: 'ok', s: '취소했어요' }; render(); return;
+  }
+  api('phoneCancel', { id: id, worker: S.worker }).then(function (j) {
+    if (!j.done) { S.msg = { t: 'err', s: j.error || '취소 못 했어요' }; render(); return; }
+    S.data.log.forEach(function (r) { if (r.id === id) r.status = '취소'; });
+    saveCache(); S.msg = { t: 'ok', s: '취소했어요' }; render();
+  }).catch(function (e) {
+    if (e.code === 'pin') return pinFail();
+    S.msg = { t: 'err', s: '보낸 기록 취소는 인터넷이 되어야 해요. (' + e.message + ')' }; render();
+  });
+}
+function back() { S.view = 'loc'; S.form = null; S.msg = null; render(); }
+
+// ---- 자리 고르기 (QR이 없거나 안 찍힐 때) · 오늘 내 기록
+function viewChoose() {
+  var c = S.choose || (S.choose = { row: '', level: 1, bay: '' });
+  var h = '<div class="card"><h3>자리 고르기 (QR을 찍으면 바로 열려요)</h3><p class="sub">줄</p><div class="grid4">';
+  ROWS.forEach(function (r) { h += '<button class="' + (c.row === r ? 'sel' : '') + '" onclick="S.choose.row=\'' + r + '\';render()">' + r + '</button>'; });
+  h += '</div><p class="sub">단</p><div class="grid4">';
+  [1, 2, 3].forEach(function (l) { h += '<button class="' + (c.level === l ? 'sel' : '') + '" onclick="S.choose.level=' + l + ';render()">' + l + '단</button>'; });
+  h += '</div><p class="sub">칸 번호</p><input type="number" inputmode="numeric" id="cBay" value="' + esc(c.bay) + '" oninput="S.choose.bay=this.value" placeholder="예: 9">';
+  h += '<button class="big" onclick="openChosen()">이 자리 열기</button></div>';
+  var mine = S.data.log.filter(function (r) { return r.worker === S.worker; });
+  h += '<div class="card"><h3>오늘 내 기록 (' + mine.filter(function (r) { return r.status !== '취소' && r.status !== '안 들어감'; }).length + '건)</h3>';
+  if (!mine.length) h += '<div class="muted">아직 없어요</div>';
+  mine.slice().reverse().forEach(function (r) { h += recLine(r); });
+  h += '</div>';
+  if (parseLoc(S.loc)) h += '<button class="big alt" onclick="back()">' + esc(parseLoc(S.loc).short) + '(으)로 돌아가기</button>';
+  return h;
+}
+function openChosen() {
+  var c = S.choose, p = parseLoc(c.row + c.level + '-' + c.bay);
+  if (!c.row || !p) { S.msg = { t: 'err', s: '줄과 칸 번호를 골라 주세요' }; render(); return; }
+  S.loc = p.short; S.view = 'loc'; S.msg = null;
+  try { history.replaceState(null, '', '?loc=' + p.short); } catch (e) {}
+  render();
+}
+
+// 받은(또는 저장해 둔) 자료에 아직 못 보낸 기록을 다시 얹음. 저장해 둔 자료가 어제 것이면 기록은 비움
+function mergeOutbox() {
+  if (!S.data) return;
+  if (S.data.today !== nowText().slice(0, 10)) { S.data.log = []; S.data.today = nowText().slice(0, 10); }
+  var have = {}; S.data.log.forEach(function (r) { have[r.id] = true; });
+  outbox().forEach(function (r) { if (!have[r.id]) S.data.log.push(Object.assign({ date: r.time.slice(0, 10), status: '보내는 중' }, r)); });
+}
+mergeOutbox();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(function () {});
+}
+render();
+load();
+</script>
+</body>
+</html>

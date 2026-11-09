@@ -65,7 +65,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-09';
+var VERSION = '2026-11-09b';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled' };
@@ -225,6 +225,7 @@ function render() {
   else if (S.view === 'pick') h += viewPick(p);
   else if (S.view === 'refill') h += viewRefill(p);
   else if (S.view === 'moveto') h += viewMoveTo(p);
+  else if (S.view === 'back') h += viewBack(p);
   else if (S.view === 'choose' || !p) h += viewChoose();
   else h += viewLoc(p);
   h += '<div class="foot">메디포스트 재고이동 · ' + VERSION + '</div>';
@@ -266,6 +267,7 @@ function recLine(r) {
   var t = r.time ? String(r.time).slice(11, 16) : '';
   var what = r.kind === 'pick'
     ? shortOf(r.loc) + ' → Picking ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '') + (r.empty ? ' ★재고X' : '')
+    : r.kind === 'back' ? 'Picking → ' + shortOf(r.loc) + ' 되돌림 ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '')
     : shortOf(r.from) + ' → ' + shortOf(r.to) + ' 파레트';
   var tag = r.status === '보내는 중' ? '<span class="tag wait">보내는 중</span>' : r.status === '가져감' ? '<span class="tag">사무실 가져감</span>'
     : r.status === '안 들어감' ? '<span class="tag bad">안 들어감</span>' : '';
@@ -281,6 +283,7 @@ function viewLoc(p) {
   h += '<button class="big" onclick="startPick()">📦 Picking으로 꺼냈어요</button>';
   h += '<button class="big alt" onclick="startRefill()">⬇ 2·3단 파레트를 여기로 내렸어요</button>';
   if (rows.length) h += '<button class="big alt" onclick="startMoveTo()">➡ 이 자리 파레트를 다른 자리로 옮겼어요</button>';
+  h += '<button class="big alt" onclick="startBack()">↩ Picking에서 여기로 되돌려 넣었어요 <span style="font-weight:600;font-size:14px">(피킹존 자리 없을 때)</span></button>';
   var recs = todayAt(p.full);
   if (recs.length) {
     h += '<div class="card"><h3>오늘 이 자리 기록</h3>';
@@ -382,6 +385,38 @@ function saveRefill() {
   if (!src) { S.msg = { t: 'err', s: f.typed ? '자리 모양이 이상해요 (예: M2-28)' : '내린 파레트 자리를 골라 주세요' }; render(); return; }
   if (src === p.full) { S.msg = { t: 'err', s: '같은 자리예요' }; render(); return; }
   send({ kind: 'bulk', from: src, to: p.full, code: f.code, name: itemOf(f.code).name });
+}
+
+// ---- Picking에서 이 Bulk 자리로 되돌림 (2026-11-09: 피킹존에 넣을 자리가 없을 때 드물게) → 사무실에서 ③ Picking에서Bulk 파일
+function startBack() {
+  var p = parseLoc(S.loc);
+  var codes = uniq(stockAt(p.full).map(function (r) { return r.code; }));
+  liveLog().forEach(function (r) { if (r.kind === 'pick' && r.loc === p.full && codes.indexOf(r.code) < 0) codes.push(r.code); });
+  S.form = { kind: 'back', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: 1, units: '', unitsOn: false };
+  S.view = 'back'; S.msg = null; render();
+}
+function viewBack(p) {
+  var f = S.form, it = f.code ? itemOf(f.code) : null;
+  S._avail = 0; S._per = it ? it.per : 0;
+  var h = '<div class="card"><h3>↩ Picking에서 ' + esc(p.short) + '(으)로 되돌려 넣었어요</h3>' +
+    '<div class="muted" style="margin-bottom:6px">피킹존에 둘 자리가 없어서 Bulk로 다시 넣을 때만 써요.</div>' + productPicker(f.codes, f.code);
+  h += '<p>되돌린 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
+    '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
+    '<button onclick="bump(1)">+</button><span>박스</span></div>';
+  h += f.unitsOn
+    ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
+    : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
+  h += '<div id="fSum"></div></div>';
+  h += '<button class="big" onclick="saveBack()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  setTimeout(sumUpd, 0);
+  return h;
+}
+function saveBack() {
+  var f = S.form, p = parseLoc(S.loc);
+  var b = parseInt(f.boxes || '0', 10) || 0, u = parseInt(f.units || '0', 10) || 0;
+  if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
+  if (b <= 0 && u <= 0) { S.msg = { t: 'err', s: '박스 수를 넣어 주세요' }; render(); return; }
+  send({ kind: 'back', loc: p.full, code: f.code, name: itemOf(f.code).name, boxes: b, units: u });
 }
 
 // ---- 이 자리 파레트를 다른 자리로

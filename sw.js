@@ -1,7 +1,7 @@
 /* 메디포스트 휴대폰 재고이동 — 화면 파일을 휴대폰에 저장해 두기 (창고에서 인터넷이 끊겨도 QR로 열리게)
  * 화면 파일(같은 주소)만 다룬다. 구글로 보내는 자료(POST)는 건드리지 않는다.
  * 인터넷이 되면 늘 새 파일을 먼저 받고(4초 기다림), 안 되면 저장해 둔 것을 보여 준다. */
-const CACHE = 'medi-move-v2';   // 11/9 업무일지 화면 더함
+const CACHE = 'medi-move-v3';   // 11/9 업무일지 화면 더함 · v3 일지 날짜 고르기·모두 지우기·되돌리기
 const FILES = ['./', './index.html', './config.js', './diary.html'];
 
 self.addEventListener('install', e => {

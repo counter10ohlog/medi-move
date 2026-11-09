@@ -20,20 +20,28 @@
   .day { display:flex; align-items:center; justify-content:center; gap:10px; margin:6px 0 2px; }
   .day b { font-size:22px; }
   .day button { width:46px; height:42px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:20px; color:var(--ink); }
+  .day button:disabled { opacity:.35; }
+  .pick { position:relative; display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+  .pick input { position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; border:0; padding:0; }
+  .past { background:var(--amber-soft); color:var(--amber); border-radius:10px; padding:8px 12px; margin:6px 0; font-size:15px; font-weight:700; text-align:center; }
+  .undo { margin-left:8px; height:36px; padding:0 14px; border-radius:10px; border:1px solid currentColor; background:#fff; color:inherit; font-weight:800; font-size:15px; }
+  .clr { width:100%; height:48px; border-radius:12px; border:1px solid var(--red); background:#fff; color:var(--red); font-weight:800; font-size:16px; margin-top:6px; }
   .meta { text-align:center; color:var(--mute); font-size:14px; margin-bottom:4px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin:10px 0; }
   .card h3 { margin:0 0 8px; font-size:16px; color:var(--mute); font-weight:800; display:flex; justify-content:space-between; align-items:center; }
   .ord { border:1px solid var(--line); border-radius:12px; padding:10px; margin:8px 0; background:#fbfcfb; }
   .ord .r1 { display:grid; grid-template-columns: 1.2fr 1fr 0.8fr 36px; gap:6px; align-items:end; }
-  .ord .r2 { display:grid; grid-template-columns: 1fr auto 14px 1fr auto; gap:6px; align-items:center; margin-top:8px; }
+  .ord .r2 { display:grid; grid-template-columns: minmax(0,1fr) auto 10px minmax(0,1fr) auto; gap:5px; align-items:center; margin-top:8px; }
+  .ord .r1 > *, .ord .r2 > * { min-width:0; }   /* 좁은 휴대폰에서 [끝] 버튼이 밖으로 밀리지 않게 */
   .tw:empty { display:none; }
   .tw { margin-top:6px; background:var(--amber-soft); color:var(--amber); border-radius:8px; padding:6px 8px; font-size:14px; font-weight:700; }
   .lab { font-size:12px; color:var(--mute); font-weight:700; display:block; margin-bottom:2px; }
   input, select, textarea { width:100%; height:46px; font-size:18px; padding:4px 8px; border:2px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
   input[type=number] { text-align:center; font-weight:700; }
-  input[type=time] { font-size:16px; padding:2px 4px; }
+  input[type=time] { font-size:15px; padding:2px 2px; min-width:0; text-align:center; }
+  input[type=time]::-webkit-calendar-picker-indicator { display:none; }   /* 시계 그림이 자리를 차지해 시각이 잘림 → 숨김(누르면 휴대폰 시간 고르기가 뜸) */
   textarea { height:84px; font-size:16px; }
-  .now { height:46px; padding:0 10px; border-radius:10px; border:1px solid var(--go); background:var(--go-soft); color:var(--go); font-weight:800; font-size:14px; }
+  .now { height:46px; padding:0 8px; white-space:nowrap; border-radius:10px; border:1px solid var(--go); background:var(--go-soft); color:var(--go); font-weight:800; font-size:14px; }
   .del { height:46px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--red); font-size:20px; }
   .add { width:100%; height:50px; border-radius:12px; border:2px dashed var(--go); background:#fff; color:var(--go); font-weight:800; font-size:17px; margin-top:4px; }
   .g4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
@@ -61,7 +69,7 @@
  * 종이 업무일지 칸을 휴대폰으로 같이 채움 → 구글 시트 [업무일지] (config.js apiUrl, 휴대폰 재고이동과 같은 웹앱·PIN)
  * 고치면 2.5초 뒤(또는 [저장]) '바꾼 칸만' 보내고 구글이 지금 내용에 합침 → 여러 명이 동시에 써도 서로 안 덮어씀.
  * 인터넷이 끊기면 휴대폰에 남았다가 연결되면 보냄. 사무실 업무허브가 데일리 리포트 카드로 가져감. */
-var VERSION = '2026-11-09b';
+var VERSION = '2026-11-09c';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var KINDS = ['건기식', '제대혈', '제대조직'];
 var BOXES = ['1호', '2호', '3호', '4호', '6호', '7호', '8호', '기타'];
@@ -172,7 +180,7 @@ function api(action, extra, keepalive) {
 function pinFail() { W.pin = ''; lsSet('mm_pin', null); D.msg = { t: 'err', s: '현장 비밀번호가 맞지 않아요. 사무실에 물어보세요' }; D.view = 'who'; render(); }
 
 function openDay(date) {
-  D.date = date; D.fresh = false; D.msg = null;
+  D.date = date; D.fresh = false; D.msg = null; D.undo = null;
   var k = lsJson(dkey(date), null);
   if (k && k.base) { D.base = norm(k.base, date); D.cur = norm(k.cur, date); D.rev = k.rev || 0; D.by = k.by || ''; D.at = k.at || ''; }
   else { D.base = null; D.cur = null; D.rev = 0; D.by = ''; D.at = ''; }
@@ -245,11 +253,15 @@ function status() {
 function render() {
   var h = '<div class="top"><div class="ttl">📝 업무일지</div><div class="who">' + (W.worker ? esc(W.worker) + ' · <a href="#" onclick="D.view=\'who\';render();return false">바꾸기</a><br>' : '') +
     '<a class="lnk" href="./">재고이동 →</a></div></div>';
-  if (D.msg) h += '<div class="' + D.msg.t + '">' + esc(D.msg.s) + '</div>';
+  if (D.msg) h += '<div class="' + D.msg.t + '">' + esc(D.msg.s) + (D.msg.undo && D.undo && D.undo.date === D.date ? '<button class="undo" onclick="undo()">↩ 되돌리기</button>' : '') + '</div>';
   if (D.view === 'who') { $('app').innerHTML = h + viewWho(); $('bar').style.display = 'none'; status(); return; }
-  var dd = new Date(D.date + 'T00:00:00');
-  h += '<div class="day"><button onclick="shift(-1)">◀</button><b>' + (dd.getMonth() + 1) + '월 ' + dd.getDate() + '일 (' + '일월화수목금토'[dd.getDay()] + ')</b><button onclick="shift(1)">▶</button></div>';
-  h += '<div class="meta">' + (D.at ? '마지막으로 고친 사람: ' + esc(D.by) + ' · ' + esc(String(D.at).slice(5, 16)) : '아직 아무도 안 썼어요') + (D.date !== ymd(new Date()) ? ' · <a class="lnk" href="#" onclick="openDay(ymd(new Date()));return false">오늘로</a>' : '') + '</div>';
+  var today = ymd(new Date());
+  // 날짜: ◀▶ 하루씩, 가운데 날짜를 누르면 달력에서 고르기 (2026-11-09 "언제든 수정하고 관리")
+  h += '<div class="day"><button onclick="shift(-1)">◀</button><label class="pick"><b>' + mdLabel(D.date) + '</b><span>📅</span>' +
+    '<input type="date" value="' + D.date + '" max="' + today + '" onclick="try{this.showPicker()}catch(e){}" onchange="pickDay(this.value)"></label>' +
+    '<button onclick="shift(1)"' + (D.date >= today ? ' disabled' : '') + '>▶</button></div>';
+  if (D.date !== today) h += '<div class="past">지난 날짜 일지예요 · 고치거나 지우면 그대로 저장되고 사무실 허브에도 들어가요 · <a class="lnk" href="#" onclick="openDay(ymd(new Date()));return false">오늘로</a></div>';
+  h += '<div class="meta">' + (D.at ? '마지막으로 고친 사람: ' + esc(D.by) + ' · ' + esc(String(D.at).slice(5, 16)) : '아직 아무도 안 썼어요') + ' · 날짜를 누르면 달력</div>';
   if (!D.cur) { $('app').innerHTML = h + '<p class="muted">불러오는 중…</p>'; $('bar').style.display = 'none'; status(); return; }
   var c = D.cur;
   // 오더
@@ -282,6 +294,8 @@ function render() {
   h += '<div class="card"><h3>근무현황</h3><div class="g3">';
   WORKERS.forEach(function (k) { h += '<label><span class="lab">' + k + '</span><input type="text" value="' + esc(c.workers[k]) + '" oninput="setG(\'workers\',\'' + k + '\',this.value)"></label>'; });
   h += '</div></div>';
+  h += '<div class="card"><h3>고치기 · 지우기</h3><div class="muted">칸을 고치면 2.5초 뒤 저절로 저장돼요(지난 날짜도). 숫자를 지우면 빈 칸, 오더 줄은 ×, 이 날 일지 전체는 아래 버튼. 지운 바로 뒤에는 [↩ 되돌리기]로 살릴 수 있어요.</div>' +
+    (hasContent(c) ? '<button class="clr" onclick="clearDay()">🗑 ' + mdLabel(D.date) + ' 일지 모두 지우기</button>' : '') + '</div>';
   h += '<div class="foot muted" style="text-align:center;margin-top:16px">메디포스트 업무일지 · ' + VERSION + ' · 쓰면 저절로 보내져요</div>';
   $('app').innerHTML = h; $('bar').style.display = '';
   chk(); status();
@@ -322,8 +336,53 @@ function setG(g, k, v) { D.cur[g][k] = v; touch(false); }
 function setO(i, k, v) { D.cur.orders[i][k] = v; touch(false); }
 function nowO(i, k) { D.cur.orders[i][k] = hm(); touch(true); }
 function addO() { var last = D.cur.orders[D.cur.orders.length - 1]; D.cur.orders.push({ id: rid(), kind: last ? last.kind : '건기식', count: null, start: '', end: '', cancel: null }); touch(true); }
-function delO(i) { var o = D.cur.orders[i]; if (!confirm((o.kind || '') + ' ' + (o.count == null ? '' : o.count + '건 ') + '줄을 지울까요?')) return; D.cur.orders.splice(i, 1); touch(true); }
-function shift(n) { if (dirty()) save(false); var d = new Date(D.date + 'T00:00:00'); d.setDate(d.getDate() + n); openDay(ymd(d)); }
+function oName(o) { return (o.kind || '') + ' ' + (o.count == null ? '' : o.count + '건 ') + '줄'; }
+function delO(i) {
+  var o = D.cur.orders[i]; if (!confirm(oName(o) + '을 지울까요?')) return;
+  D.undo = { date: D.date, kind: 'row', row: clone(o), index: i };
+  D.cur.orders.splice(i, 1);
+  D.msg = { t: 'ok', s: '🗑 ' + oName(o) + '을 지웠어요', undo: true };
+  touch(true);
+}
+// 2026-11-09 김문수 님 "입력·수정·삭제 모두, 언제든 수정하고 관리" — 하루 일지 통째로 지우기 + 바로 되돌리기
+function hasContent(c) {
+  return !!(c.orders.length || c.add != null || c.memo || BOXES.some(function (k) { return c.boxes[k] != null; }) ||
+    MRO.some(function (k) { return c.mro[k] != null; }) || WORKERS.some(function (k) { return c.workers[k]; }));
+}
+function mdLabel(date) { var d = new Date(date + 'T00:00:00'); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + '일월화수목금토'[d.getDay()] + ')'; }
+function clearDay() {
+  var c = D.cur, md = mdLabel(D.date);
+  if (!c || !hasContent(c)) return;
+  if (!confirm(md + ' 업무일지를 모두 지울까요?\n(오더 ' + c.orders.length + '줄, 추송·박스·부자재·특이사항·근무현황 모두)\n\n다른 휴대폰과 사무실 허브에서도 지워져요.\n지운 바로 뒤에는 [되돌리기]로 살릴 수 있어요.')) return;
+  D.undo = { date: D.date, kind: 'all', doc: clone(c) };
+  D.cur = emptyDoc(D.date);
+  D.msg = { t: 'ok', s: '🗑 ' + md + ' 일지를 모두 지웠어요', undo: true };
+  touch(true); save(false);
+}
+function undo() {
+  var u = D.undo;
+  if (!u || u.date !== D.date || !D.cur) return;
+  if (u.kind === 'row') {
+    if (!D.cur.orders.some(function (o) { return o.id === u.row.id; })) {
+      // 구글은 새 줄을 맨 끝에 붙이므로, 뒤에 있던 줄들을 새 번호로 다시 보내 원래 자리(차수 순서)를 지킴
+      var at = Math.min(u.index, D.cur.orders.length);
+      var after = D.cur.orders.slice(at).map(function (o) { var x = clone(o); x.id = rid(); return x; });
+      D.cur.orders = D.cur.orders.slice(0, at).concat([clone(u.row)], after);
+    }
+  } else {
+    D.cur = apply(D.cur, diff(emptyDoc(D.date), norm(u.doc, D.date)));   // 지운 칸만 살림 (그 사이 다른 사람이 쓴 칸은 그대로)
+  }
+  D.undo = null;
+  D.msg = { t: 'ok', s: '↩ 되돌렸어요' };
+  touch(true); save(false);
+}
+function shift(n) { var d = new Date(D.date + 'T00:00:00'); d.setDate(d.getDate() + n); pickDay(ymd(d)); }
+function pickDay(v) {
+  if (!/^\d{4}-\d\d-\d\d$/.test(v || '') || v === D.date) return;
+  if (v > ymd(new Date())) { D.msg = { t: 'warn', s: '앞으로 올 날짜의 일지는 쓸 수 없어요' }; render(); return; }
+  if (dirty()) save(false);
+  openDay(v);
+}
 
 function viewWho() {
   return '<div class="card"><h3>처음 한 번만 넣어요</h3><p>이름</p><input type="text" id="wName" value="' + esc(W.worker) + '" placeholder="예: 홍길동">' +

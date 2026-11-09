@@ -25,7 +25,6 @@
   .pick input { position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; border:0; padding:0; }
   .past { background:var(--amber-soft); color:var(--amber); border-radius:10px; padding:8px 12px; margin:6px 0; font-size:15px; font-weight:700; text-align:center; }
   .undo { margin-left:8px; height:36px; padding:0 14px; border-radius:10px; border:1px solid currentColor; background:#fff; color:inherit; font-weight:800; font-size:15px; }
-  .clr { width:100%; height:48px; border-radius:12px; border:1px solid var(--red); background:#fff; color:var(--red); font-weight:800; font-size:16px; margin-top:6px; }
   .meta { text-align:center; color:var(--mute); font-size:14px; margin-bottom:4px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin:10px 0; }
   .card h3 { margin:0 0 8px; font-size:16px; color:var(--mute); font-weight:800; display:flex; justify-content:space-between; align-items:center; }
@@ -69,7 +68,7 @@
  * 종이 업무일지 칸을 휴대폰으로 같이 채움 → 구글 시트 [업무일지] (config.js apiUrl, 휴대폰 재고이동과 같은 웹앱·PIN)
  * 고치면 2.5초 뒤(또는 [저장]) '바꾼 칸만' 보내고 구글이 지금 내용에 합침 → 여러 명이 동시에 써도 서로 안 덮어씀.
  * 인터넷이 끊기면 휴대폰에 남았다가 연결되면 보냄. 사무실 업무허브가 데일리 리포트 카드로 가져감. */
-var VERSION = '2026-11-09c';
+var VERSION = '2026-11-09d';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var KINDS = ['건기식', '제대혈', '제대조직'];
 var BOXES = ['1호', '2호', '3호', '4호', '6호', '7호', '8호', '기타'];
@@ -294,8 +293,8 @@ function render() {
   h += '<div class="card"><h3>근무현황</h3><div class="g3">';
   WORKERS.forEach(function (k) { h += '<label><span class="lab">' + k + '</span><input type="text" value="' + esc(c.workers[k]) + '" oninput="setG(\'workers\',\'' + k + '\',this.value)"></label>'; });
   h += '</div></div>';
-  h += '<div class="card"><h3>고치기 · 지우기</h3><div class="muted">칸을 고치면 2.5초 뒤 저절로 저장돼요(지난 날짜도). 숫자를 지우면 빈 칸, 오더 줄은 ×, 이 날 일지 전체는 아래 버튼. 지운 바로 뒤에는 [↩ 되돌리기]로 살릴 수 있어요.</div>' +
-    (hasContent(c) ? '<button class="clr" onclick="clearDay()">🗑 ' + mdLabel(D.date) + ' 일지 모두 지우기</button>' : '') + '</div>';
+  // 11/9 김문수 님 "모두 지우기는 위험해 보인다, 수정할 수 있으니 없애줘" → 하루 전체 지우기 버튼은 없음. 칸·줄 단위로만 고치고 지움
+  h += '<div class="card"><h3>고치기 · 지우기</h3><div class="muted">칸을 고치면 2.5초 뒤 저절로 저장돼요(지난 날짜도). 잘못 쓴 숫자는 지우면 빈 칸, 오더 줄은 ×로 지워요. 줄을 지운 바로 뒤에는 [↩ 되돌리기]로 살릴 수 있어요.</div></div>';
   h += '<div class="foot muted" style="text-align:center;margin-top:16px">메디포스트 업무일지 · ' + VERSION + ' · 쓰면 저절로 보내져요</div>';
   $('app').innerHTML = h; $('bar').style.display = '';
   chk(); status();
@@ -344,33 +343,15 @@ function delO(i) {
   D.msg = { t: 'ok', s: '🗑 ' + oName(o) + '을 지웠어요', undo: true };
   touch(true);
 }
-// 2026-11-09 김문수 님 "입력·수정·삭제 모두, 언제든 수정하고 관리" — 하루 일지 통째로 지우기 + 바로 되돌리기
-function hasContent(c) {
-  return !!(c.orders.length || c.add != null || c.memo || BOXES.some(function (k) { return c.boxes[k] != null; }) ||
-    MRO.some(function (k) { return c.mro[k] != null; }) || WORKERS.some(function (k) { return c.workers[k]; }));
-}
 function mdLabel(date) { var d = new Date(date + 'T00:00:00'); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + '일월화수목금토'[d.getDay()] + ')'; }
-function clearDay() {
-  var c = D.cur, md = mdLabel(D.date);
-  if (!c || !hasContent(c)) return;
-  if (!confirm(md + ' 업무일지를 모두 지울까요?\n(오더 ' + c.orders.length + '줄, 추송·박스·부자재·특이사항·근무현황 모두)\n\n다른 휴대폰과 사무실 허브에서도 지워져요.\n지운 바로 뒤에는 [되돌리기]로 살릴 수 있어요.')) return;
-  D.undo = { date: D.date, kind: 'all', doc: clone(c) };
-  D.cur = emptyDoc(D.date);
-  D.msg = { t: 'ok', s: '🗑 ' + md + ' 일지를 모두 지웠어요', undo: true };
-  touch(true); save(false);
-}
-function undo() {
+function undo() {   // 오더 줄 지운 것 되돌리기
   var u = D.undo;
   if (!u || u.date !== D.date || !D.cur) return;
-  if (u.kind === 'row') {
-    if (!D.cur.orders.some(function (o) { return o.id === u.row.id; })) {
-      // 구글은 새 줄을 맨 끝에 붙이므로, 뒤에 있던 줄들을 새 번호로 다시 보내 원래 자리(차수 순서)를 지킴
-      var at = Math.min(u.index, D.cur.orders.length);
-      var after = D.cur.orders.slice(at).map(function (o) { var x = clone(o); x.id = rid(); return x; });
-      D.cur.orders = D.cur.orders.slice(0, at).concat([clone(u.row)], after);
-    }
-  } else {
-    D.cur = apply(D.cur, diff(emptyDoc(D.date), norm(u.doc, D.date)));   // 지운 칸만 살림 (그 사이 다른 사람이 쓴 칸은 그대로)
+  if (!D.cur.orders.some(function (o) { return o.id === u.row.id; })) {
+    // 구글은 새 줄을 맨 끝에 붙이므로, 뒤에 있던 줄들을 새 번호로 다시 보내 원래 자리(차수 순서)를 지킴
+    var at = Math.min(u.index, D.cur.orders.length);
+    var after = D.cur.orders.slice(at).map(function (o) { var x = clone(o); x.id = rid(); return x; });
+    D.cur.orders = D.cur.orders.slice(0, at).concat([clone(u.row)], after);
   }
   D.undo = null;
   D.msg = { t: 'ok', s: '↩ 되돌렸어요' };

@@ -65,10 +65,14 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-09b';
+var VERSION = '2026-11-12a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
-var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled' };
+var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
+/* 2026-11-12 김문수 님 "Bulk에서 Bulk로 옮길 때 시작점 QR과 도착점 QR을 찍어서 바로 이동" →
+ * 출발 자리 QR → [➡ 다른 자리로] → 품목 → [📷 넣은 자리 QR 찍기] → '옮기는 중'을 휴대폰에 10분 저장
+ * → 휴대폰 카메라로 도착 자리 QR (화면이 새로 열림) → "출발 → 도착" 확인 → [저장]. 손으로 자리 넣기도 남김 */
+var PEND_MIN = 10;
 function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
 function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
 function lsJson(k, d) { try { var v = JSON.parse(lsGet(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
@@ -95,6 +99,24 @@ function parseLoc(s) {
 }
 function shortOf(full) { var p = parseLoc(full); return p ? p.short : full; }
 S.loc = (parseLoc(LOC0) || {}).short || '';
+
+// ---- '옮기는 중' (출발 QR을 찍고 도착 QR을 기다림) — 이 휴대폰에만, 10분 지나면 저절로 지움
+function pendGet() {
+  var p = lsJson(K.pend, null);
+  if (!p || !p.from || !p.code) return null;
+  if (Date.now() - (p.at || 0) > PEND_MIN * 60000) { lsSet(K.pend, null); return null; }
+  return p;
+}
+function pendSet(p) { lsSet(K.pend, p ? JSON.stringify(p) : null); }
+function pendLeft(p) { return Math.max(0, Math.ceil((PEND_MIN * 60000 - (Date.now() - p.at)) / 60000)); }
+// QR(또는 자리 고르기)로 이 자리가 열렸을 때 '옮기는 중'이면 → 출발과 다르면 확인 화면, 같으면 기다리는 화면
+function pendRoute() {
+  var pd = pendGet(), p = parseLoc(S.loc);
+  if (!pd || !p) return;
+  if (pd.from === p.full) { S.view = 'waitdest'; S.msg = { t: 'warn', s: '여기는 출발 자리예요. 파레트를 넣은 자리의 QR을 찍어 주세요' }; }
+  else { S.view = 'confirmMove'; S.msg = null; }
+}
+pendRoute();
 
 // ---------------------------------------------------------------- 구글 웹앱 부르기
 // 구글 전달(리다이렉트)이 가끔 진짜 응답 대신 상태({ok, app})를 줄 때가 있어 kind를 보고 3번까지 다시 보냄 (dailylist와 같은 방식)
@@ -184,7 +206,13 @@ function banner() {
 }
 window.addEventListener('online', function () { failStreak = 0; flush(); if (!S.fresh) load(); });
 window.addEventListener('pagehide', function () { flush(true); });
-document.addEventListener('visibilitychange', function () { if (document.hidden) flush(true); else { failStreak = 0; load(); } });
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { flush(true); return; }
+  failStreak = 0;
+  // 도착 QR로 열린 다른 창에서 저장·그만뒀으면 이 창의 '옮기는 중' 화면을 닫음
+  if ((S.view === 'waitdest' || S.view === 'confirmMove') && !pendGet()) { S.view = 'loc'; S.msg = { t: 'ok', s: '옮기기는 다른 창에서 끝났어요' }; render(); }
+  load();
+});
 
 // ---------------------------------------------------------------- 자료 계산
 function itemOf(code) {
@@ -220,11 +248,19 @@ function render() {
   h += '<div class="top"><div class="loc">' + (p ? esc(p.short) + '<small>' + p.level + '단</small>' : '재고이동 기록') + '</div>';
   h += '<div class="who">' + (S.worker ? esc(S.worker) + ' · <a href="#" onclick="S.view=\'who\';S.msg=null;render();return false">바꾸기</a><br>' : '') + '<a href="diary.html">📝 업무일지</a></div></div>';
   if (S.msg) h += '<div class="' + S.msg.t + '">' + esc(S.msg.s) + '</div>';
+  var pd = S.view !== 'who' ? pendGet() : null;
+  if (pd && S.view !== 'waitdest' && S.view !== 'confirmMove') {   // 옮기는 중인데 다른 화면에 있을 때
+    h += '<div class="warn"><b>➡ ' + esc(shortOf(pd.from)) + ' 파레트 옮기는 중</b> (' + esc(pd.name || pd.code) + ') — 넣은 자리 QR을 찍어 주세요 · ' + pendLeft(pd) + '분 남음' +
+      (p && p.full !== pd.from ? '<br><button class="small" style="margin-top:6px" onclick="S.view=\'confirmMove\';S.msg=null;render()">여기(' + esc(p.short) + ')에 넣었어요</button> ' : '<br>') +
+      '<button class="small" style="margin-top:6px" onclick="pendStop()">옮기기 그만</button></div>';
+  }
   if (S.view === 'who') h += viewWho();
   else if (!S.data) h += '<p class="muted">불러오는 중…</p>';
   else if (S.view === 'pick') h += viewPick(p);
   else if (S.view === 'refill') h += viewRefill(p);
   else if (S.view === 'moveto') h += viewMoveTo(p);
+  else if (S.view === 'waitdest') h += viewWaitDest();
+  else if (S.view === 'confirmMove' && pendGet() && p) h += viewConfirmMove(p);
   else if (S.view === 'back') h += viewBack(p);
   else if (S.view === 'choose' || !p) h += viewChoose();
   else h += viewLoc(p);
@@ -282,7 +318,7 @@ function viewLoc(p) {
   var h = stockCard(p);
   h += '<button class="big" onclick="startPick()">📦 Picking으로 꺼냈어요</button>';
   h += '<button class="big alt" onclick="startRefill()">⬇ 2·3단 파레트를 여기로 내렸어요</button>';
-  if (rows.length) h += '<button class="big alt" onclick="startMoveTo()">➡ 이 자리 파레트를 다른 자리로 옮겼어요</button>';
+  if (rows.length) h += '<button class="big alt" onclick="startMoveTo()">➡ 이 자리 파레트를 다른 자리로 옮겼어요 <span style="font-weight:600;font-size:14px">(넣은 자리 QR 찍기)</span></button>';
   h += '<button class="big alt" onclick="startBack()">↩ Picking에서 여기로 되돌려 넣었어요 <span style="font-weight:600;font-size:14px">(피킹존 자리 없을 때)</span></button>';
   var recs = todayAt(p.full);
   if (recs.length) {
@@ -427,11 +463,53 @@ function startMoveTo() {
 }
 function viewMoveTo(p) {
   var f = S.form;
-  return '<div class="card"><h3>➡ ' + esc(p.short) + ' 파레트를 다른 자리로 옮겼어요</h3>' + productPicker(f.codes, f.code) +
+  return '<div class="card"><h3>➡ ' + esc(p.short) + ' 파레트를 다른 자리로 옮겼어요</h3>' + productPicker(f.codes, f.code) + '</div>' +
+    '<button class="big" onclick="beginScan()">📷 넣은 자리 QR 찍기</button>' +
+    '<div class="muted" style="margin:-2px 2px 8px">누르고 나서 휴대폰 카메라로 파레트를 넣은 자리의 QR을 찍으면 확인 화면이 떠요 (' + PEND_MIN + '분 안)</div>' +
+    '<details class="card"><summary class="sub">QR이 안 찍힐 때: 넣은 자리 직접 넣기</summary>' +
     '<p>넣은 자리 (예: M1-15)</p><input type="text" id="fTo" value="' + esc(f.typed) +
-    '" oninput="S.form.typed=this.value.toUpperCase()" autocapitalize="characters" placeholder="M1-15"></div>' +
-    '<button class="big" onclick="saveMoveTo()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+    '" oninput="S.form.typed=this.value.toUpperCase()" autocapitalize="characters" placeholder="M1-15">' +
+    '<button class="big alt" onclick="saveMoveTo()">이 자리로 저장</button></details>' +
+    '<button class="big alt" onclick="back()">뒤로</button>';
 }
+function beginScan() {
+  var f = S.form, p = parseLoc(S.loc);
+  if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
+  pendSet({ from: p.full, code: f.code, name: itemOf(f.code).name, at: Date.now(), worker: S.worker });
+  S.form = null; S.view = 'waitdest'; S.msg = null; render();
+}
+function viewWaitDest() {
+  var pd = pendGet();
+  if (!pd) return '<div class="card">옮기는 중인 파레트가 없어요 (' + PEND_MIN + '분이 지났거나 저장·취소했어요).</div><button class="big alt" onclick="back()">돌아가기</button>';
+  return '<div class="card" style="border:2px solid var(--go)"><h3>➡ 옮기는 중 · ' + pendLeft(pd) + '분 남음</h3>' +
+    '<div style="font-size:24px;font-weight:800">' + esc(shortOf(pd.from)) + ' → <span style="color:var(--go)">?</span></div>' +
+    '<div class="item"><b>' + esc(pd.name || pd.code) + '</b> <span class="sub">' + esc(pd.code) + '</span></div>' +
+    '<div class="ok" style="font-size:17px">📷 이제 휴대폰 카메라로 <b>파레트를 넣은 자리의 QR</b>을 찍어 주세요</div></div>' +
+    '<button class="big alt" onclick="S.view=\'choose\';S.msg=null;render()">QR이 안 찍히면: 넣은 자리 고르기</button>' +
+    '<button class="big alt" onclick="pendStop()">옮기기 그만</button>';
+}
+function viewConfirmMove(p) {
+  var pd = pendGet(), here = stockAt(p.full);
+  var other = here.filter(function (r) { return r.code !== pd.code; });
+  var h = '<div class="card" style="border:2px solid var(--go)"><h3>이렇게 옮겼어요?</h3>' +
+    '<div style="font-size:30px;font-weight:900;line-height:1.2">' + esc(shortOf(pd.from)) + ' → <span style="color:var(--go)">' + esc(p.short) + '</span></div>' +
+    '<div class="sub">' + esc(String(parseLoc(pd.from).level)) + '단 → ' + p.level + '단 · 파레트 통째로</div>' +
+    '<div class="item"><b>' + esc(pd.name || pd.code) + '</b> <span class="sub">' + esc(pd.code) + '</span></div>';
+  if (other.length) h += '<div class="warn">이 자리(' + esc(p.short) + ')에 다른 품목이 있어요: ' + esc(other.map(function (r) { return r.name || itemOf(r.code).name; }).join(', ')) + ' — 맞는지 확인해 주세요 (한 자리 한 제품)</div>';
+  else if (here.length) h += '<div class="muted">이 자리에 같은 품목이 이미 있어요 (재고 현황 기준).</div>';
+  h += '</div><button class="big" onclick="saveConfirmMove()">✓ 저장</button>' +
+    '<button class="big alt" onclick="S.view=\'waitdest\';S.msg=null;render()">다른 자리예요 — 다시 찍기</button>' +
+    '<button class="big alt" onclick="pendStop()">옮기기 그만</button>';
+  return h;
+}
+function saveConfirmMove() {
+  var pd = pendGet(), p = parseLoc(S.loc);
+  if (!pd) { S.msg = { t: 'err', s: '옮기는 중인 파레트가 없어요 (' + PEND_MIN + '분이 지났어요). 출발 자리 QR부터 다시 찍어 주세요' }; S.view = 'loc'; render(); return; }
+  if (!p || p.full === pd.from) { S.msg = { t: 'err', s: '출발 자리와 같아요' }; render(); return; }
+  pendSet(null);
+  send({ kind: 'bulk', from: pd.from, to: p.full, code: pd.code, name: pd.name || itemOf(pd.code).name });
+}
+function pendStop() { pendSet(null); S.view = 'loc'; S.form = null; S.msg = { t: 'ok', s: '옮기기를 그만뒀어요 (저장 안 함)' }; render(); }
 function saveMoveTo() {
   var f = S.form, p = parseLoc(S.loc), to = parseLoc(f.typed);
   if (!f.code) { S.msg = { t: 'err', s: '품목을 골라 주세요' }; render(); return; }
@@ -492,6 +570,7 @@ function openChosen() {
   if (!c.row || !p) { S.msg = { t: 'err', s: '줄과 칸 번호를 골라 주세요' }; render(); return; }
   S.loc = p.short; S.view = 'loc'; S.msg = null;
   try { history.replaceState(null, '', '?loc=' + p.short); } catch (e) {}
+  pendRoute();   // 옮기는 중이면 → 이 자리로 확인 화면
   render();
 }
 

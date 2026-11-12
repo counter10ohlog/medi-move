@@ -10,13 +10,16 @@
           --amber:#8a5300; --amber-soft:#fff3dc; --red:#b42318; --red-soft:#fde8e6; --blue:#1d4ed8; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.45 -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
-  .wrap { max-width:520px; margin:0 auto; padding:12px 14px 40px; }
+  .wrap { max-width:520px; margin:0 auto; padding:12px 14px 96px; }   /* 아래 안내 줄 자리를 늘 비워 둠 (11/12) */
   .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:4px 2px 10px; }
   .loc { font-size:34px; font-weight:800; letter-spacing:.5px; }
   .loc small { font-size:16px; font-weight:600; color:var(--mute); margin-left:6px; }
   .who { font-size:14px; color:var(--mute); text-align:right; }
   .who a { color:var(--blue); }
-  #banner { position:sticky; top:0; z-index:5; background:var(--amber-soft); color:var(--amber); font-weight:700; font-size:15px; padding:10px 14px; border-bottom:1px solid #ecd29a; }
+  /* 11/12 김문수 님 "QR 찍고 들어가면 노란 안내가 나오며 칸이 밀려 잘못 눌림 — 아래쪽에 나오거나 안 나오게"
+     → 화면 맨 아래에 고정(내용을 밀지 않음), 불러오는 동안은 안 띄움 */
+  #banner { position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--amber-soft); color:var(--amber); font-weight:700; font-size:14px;
+            padding:10px 14px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid #ecd29a; box-shadow:0 -2px 8px rgba(0,0,0,.06); }
   #banner.hide { display:none; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:10px 0; }
   .card h3 { margin:0 0 6px; font-size:15px; color:var(--mute); font-weight:700; }
@@ -65,7 +68,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-12a';
+var VERSION = '2026-11-12b';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -152,14 +155,14 @@ function load() {
   if (!S.worker || !S.pin) { S.view = 'who'; render(); return; }
   api('phoneData').then(function (res) {
     S.data = { at: nowText(), today: res.today, stockTime: res.stockTime, stock: res.stock, items: res.items, log: res.log };
-    S.fresh = true;
+    S.fresh = true; S.loadFailed = false;
     mergeOutbox();
     lsSet(K.cache, JSON.stringify(S.data));
     if (S.view === 'who') S.view = 'loc';
     render(); flush();
   }).catch(function (e) {
     if (e.code === 'pin') return pinFail();
-    S.fresh = false;
+    S.fresh = false; S.loadFailed = true;   // 받기에 실패했을 때만 '인터넷 없이 저장된 자료' 안내
     if (!S.data) S.msg = { t: 'err', s: '처음 한 번은 인터넷이 되는 곳에서 열어 주세요. (' + e.message + ')' };
     render();
   });
@@ -201,7 +204,7 @@ function banner() {
   if (!b) return;
   if (!CFG.apiUrl) { b.textContent = '설정 전: config.js에 구글 웹앱 주소가 없어요'; b.className = ''; return; }
   if (c) { b.textContent = '📶 아직 못 보낸 기록 ' + c + '건 — 휴대폰에 저장돼 있어요. 연결되면 자동으로 보내요'; b.className = ''; }
-  else if (S.data && !S.fresh) { b.textContent = '인터넷 없이 저장된 자료로 보고 있어요 (' + esc((S.data.at || '').slice(5, 16)) + ' 받음)'; b.className = ''; }
+  else if (S.data && !S.fresh && S.loadFailed) { b.textContent = '인터넷 없이 저장된 자료로 보고 있어요 (' + esc((S.data.at || '').slice(5, 16)) + ' 받음)'; b.className = ''; }
   else { b.textContent = ''; b.className = 'hide'; }
 }
 window.addEventListener('online', function () { failStreak = 0; flush(); if (!S.fresh) load(); });

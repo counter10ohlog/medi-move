@@ -68,7 +68,7 @@
  * 종이 업무일지 칸을 휴대폰으로 같이 채움 → 구글 시트 [업무일지] (config.js apiUrl, 휴대폰 재고이동과 같은 웹앱·PIN)
  * 고치면 2.5초 뒤(또는 [저장]) '바꾼 칸만' 보내고 구글이 지금 내용에 합침 → 여러 명이 동시에 써도 서로 안 덮어씀.
  * 인터넷이 끊기면 휴대폰에 남았다가 연결되면 보냄. 사무실 업무허브가 데일리 리포트 카드로 가져감. */
-var VERSION = '2026-11-09d';
+var VERSION = '2026-11-12a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var KINDS = ['건기식', '제대혈', '제대조직'];
 var BOXES = ['1호', '2호', '3호', '4호', '6호', '7호', '8호', '기타'];
@@ -194,11 +194,12 @@ function load() {
     var server = norm(j.doc, date);
     if (dirty()) { var mine = diff(D.base, D.cur); D.cur = apply(server, mine); }   // 내가 고친 칸은 남기고 다른 사람 것을 합침
     else D.cur = clone(server);
-    D.base = server; D.rev = j.rev; D.by = j.by; D.at = j.at; D.fresh = true;
+    D.base = server; D.rev = j.rev; D.by = j.by; D.at = j.at; D.fresh = true; D.loadFailed = false;
     keep(); softRender();
     if (dirty()) save(false);
   }).catch(function (e) {
     if (e.code === 'pin') return pinFail();
+    D.loadFailed = true;   // 11/12 받기에 실패했을 때만 '인터넷 없이' 안내 (불러오는 동안 노란 줄이 떴다 사라지며 칸이 밀리던 것)
     if (!D.base) { D.base = emptyDoc(date); D.cur = emptyDoc(date); D.msg = { t: 'warn', s: '인터넷이 안 돼서 빈 일지로 열었어요. 쓰면 휴대폰에 저장했다가 연결되면 합쳐서 보내요.' }; }
     render();
   });
@@ -244,8 +245,8 @@ function status() {
   if (st) st.textContent = D.sending ? '보내는 중…' : d ? (failN ? '📶 휴대폰에 저장됨 · 연결되면 보내요' : '고친 내용 있음 · 곧 보내요') : (D.at ? '✓ 보냄 · ' + D.by + ' ' + String(D.at).slice(11, 16) : '아직 아무도 안 썼어요');
   if (b) {
     if (!CFG.apiUrl) { b.className = ''; b.textContent = '설정 전: config.js에 구글 웹앱 주소가 없어요'; }
-    else if (d && (failN || !D.fresh)) { b.className = ''; b.textContent = '📶 아직 못 보낸 고친 내용이 있어요 — 휴대폰에 저장돼 있고 인터넷이 되면 보내요'; }
-    else if (!D.fresh && D.base) { b.className = ''; b.textContent = '인터넷 없이 휴대폰에 저장된 일지를 보고 있어요'; }
+    else if (d && (failN || D.loadFailed)) { b.className = ''; b.textContent = '📶 아직 못 보낸 고친 내용이 있어요 — 휴대폰에 저장돼 있고 인터넷이 되면 보내요'; }
+    else if (!D.fresh && D.base && D.loadFailed) { b.className = ''; b.textContent = '인터넷 없이 휴대폰에 저장된 일지를 보고 있어요'; }
     else { b.className = 'hide'; b.textContent = ''; }
   }
 }

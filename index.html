@@ -3,60 +3,140 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="theme-color" content="#13795b">
+<meta name="theme-color" content="#ffffff">
 <title>메디포스트 재고이동</title>
 <style>
-  :root { --bg:#f3f5f4; --card:#fff; --ink:#17201b; --mute:#5d6a63; --line:#d9e0dc; --go:#13795b; --go-soft:#e3f3ec;
-          --amber:#8a5300; --amber-soft:#fff3dc; --red:#b42318; --red-soft:#fde8e6; --blue:#1d4ed8; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.45 -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
-  .wrap { max-width:520px; margin:0 auto; padding:12px 14px 96px; }   /* 아래 안내 줄 자리를 늘 비워 둠 (11/12) */
-  .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:4px 2px 10px; }
-  .loc { font-size:34px; font-weight:800; letter-spacing:.5px; }
-  .loc small { font-size:16px; font-weight:600; color:var(--mute); margin-left:6px; }
-  .who { font-size:14px; color:var(--mute); text-align:right; }
-  .who a { color:var(--blue); }
+  /* 2026-11-13 김문수 님 "업무 허브랑 깔맞춤 · 누구든 쓰기 좋게 가독성 · 로케이션·제품명·LOT 잘 보이게"
+     → 업무허브 밝은 테마 색 그대로(연한 회녹색 바탕 · 흰 카드 · 초록 #12804f · 알약 모양 표시 · 허브 로고).
+     중요한 세 가지는 어느 화면에서나 같은 모양: 자리 = 초록 상자 굵은 글씨(.lc · 맨 위 큰 자리 .hero),
+     제품명 = 크고 굵게(.pn), LOT = 파란 상자(.lot) + 유통기한 회색 상자(.exp). 작은 글자도 흰 바탕 대비 4.5:1 이상 */
+  :root { --bg:#eef2f1; --card:#fff; --ink:#1f2d2a; --ink2:#4d5d59; --mute:#5f6f6b; --line:#dce4e1; --edge:#e1e8e5;
+          --go:#12804f; --go-ink:#0f6e47; --go-soft:#e2f3ea; --go-line:#bfe3cf;
+          --amber:#94600c; --amber-ink:#7a4f0a; --amber-soft:#fff3d6; --amber-line:#f0d8a0;
+          --red:#c93c3c; --red-ink:#9b2c2c; --red-soft:#fdeaea; --red-line:#f3c4c4;
+          --blue-ink:#1f4f9e; --blue-soft:#e8f0fc; --blue-line:#c9daf6; --gray-soft:#eef1f0;
+          --sh:0 1px 2px rgba(20,40,35,.05),0 4px 14px rgba(20,40,35,.06); }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.5 "Malgun Gothic","Apple SD Gothic Neo",system-ui,-apple-system,"Noto Sans KR",sans-serif;
+         word-break:keep-all; overflow-wrap:break-word; }   /* 한글은 띄어쓰기에서 줄바꿈 (낱글자로 안 끊김) */
+  button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .wrap { max-width:520px; margin:0 auto; padding:0 14px 96px; }   /* 아래 안내 줄 자리를 늘 비워 둠 (11/12) */
+  /* 위쪽 막대 — 업무허브 왼쪽 위와 같은 로고 */
+  .bar { display:flex; align-items:center; gap:10px; margin:0 -14px 12px; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); }
+  .bar svg { width:32px; height:32px; flex:none; }
+  .bar .bt { flex:1; min-width:0; line-height:1.25; }
+  .bar .bt b { display:block; font-size:16px; letter-spacing:-.3px; }
+  .bar .bt small { display:block; font-size:12px; color:var(--mute); }
+  .who { font-size:14px; color:var(--ink2); text-align:right; line-height:1.5; }
+  .who b { color:var(--ink); }
+  .who a { color:var(--blue-ink); font-weight:700; text-decoration:none; }
+  /* 지금 자리 (QR로 연 자리) — 가장 크게 */
+  .hero { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--edge); border-left:6px solid var(--go);
+          border-radius:16px; box-shadow:var(--sh); padding:10px 16px 12px; margin:0 0 12px; }
+  .hero .hl { flex:1; min-width:0; }
+  .hero .hk { font-size:13px; font-weight:800; color:var(--mute); }
+  .hero .hloc { font-size:50px; line-height:1.05; font-weight:900; letter-spacing:1px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .hero .hnone { font-size:17px; font-weight:700; color:var(--ink2); margin-top:2px; }
+  .hero .hr { text-align:right; font-size:15px; font-weight:700; color:var(--ink2); line-height:1.6; }
+  .hero .full { display:block; font-size:12.5px; font-weight:600; color:var(--mute); }
+  .lv { display:inline-flex; align-items:center; padding:1px 12px; border-radius:999px; font-size:16px; font-weight:900; background:var(--gray-soft); color:var(--ink2); border:1px solid var(--line); }
+  .lv.l1 { background:var(--go-soft); color:var(--go-ink); border-color:var(--go-line); }
+  /* 카드 */
+  .card { background:var(--card); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--sh); padding:14px 16px; margin:12px 0; }
+  .card.hot { border:2px solid var(--go); }
+  .card.mine.un { border:2px solid var(--amber); }
+  .card h3 { margin:0 0 8px; font-size:16px; color:var(--ink2); font-weight:800; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .card h3 .when { font-weight:600; font-size:13px; color:var(--mute); }
+  .card h3 .lc { font-size:16px; }
+  .card p { margin:14px 0 6px; font-size:16px; font-weight:700; color:var(--ink2); }
+  details.card summary { font-size:15px; font-weight:700; color:var(--ink2); padding:4px 0; }
+  /* 중요한 것: 자리 · 제품명 · LOT */
+  .lc { display:inline-block; padding:0 8px; border-radius:8px; background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line);
+        font-weight:900; letter-spacing:.3px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .lc.pk { background:var(--gray-soft); color:var(--ink); border-color:var(--line); font-weight:800; }
+  .lc.xl { font-size:26px; padding:1px 12px; border-radius:10px; }
+  .prod { padding:12px 0 10px; border-top:1px solid var(--line); }
+  .prod:first-of-type { border-top:0; padding-top:2px; }
+  .pn { font-size:21px; font-weight:800; line-height:1.3; color:var(--ink); word-break:keep-all; overflow-wrap:anywhere; }
+  .pc { font-size:13px; font-weight:700; color:var(--mute); letter-spacing:.3px; }
+  .ids { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
+  .lot, .exp { display:inline-flex; align-items:baseline; gap:6px; padding:2px 10px; border-radius:9px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .lot { background:var(--blue-soft); border:1px solid var(--blue-line); color:var(--blue-ink); font-size:20px; font-weight:900; letter-spacing:.5px; }
+  .exp { background:var(--gray-soft); border:1px solid var(--line); color:var(--ink); font-size:16px; font-weight:700; }
+  .lot i, .exp i { font-style:normal; font-size:12px; font-weight:800; letter-spacing:0; }
+  .exp i { color:var(--ink2); }
+  .qty { font-size:16px; color:var(--ink2); margin-top:6px; }
+  .qty b { font-size:24px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+  /* 큰 버튼 (업무허브 초록 버튼과 같은 색) */
+  .big { display:flex; align-items:center; gap:12px; width:100%; min-height:62px; margin:10px 0; padding:12px 16px; border-radius:14px; border:0;
+         background:linear-gradient(90deg,#16915b,#12804f); color:#fff; font-size:19px; font-weight:800; line-height:1.3; text-align:left; box-shadow:0 4px 12px rgba(18,128,79,.22); }
+  .big .ic { flex:none; width:30px; font-size:24px; text-align:center; }
+  .big .bx { flex:1; min-width:0; }
+  .big small { display:block; font-size:14px; font-weight:600; opacity:.9; margin-top:1px; }
+  .big.alt { background:#fff; color:var(--go-ink); border:1.5px solid var(--go-line); box-shadow:var(--sh); }
+  .big.alt small { color:var(--ink2); opacity:1; }
+  .big.gray { background:#fff; color:var(--ink2); border:1.5px solid #d3ddd9; box-shadow:none; font-size:17px; min-height:54px; }
+  .big:active { transform:translateY(1px); filter:brightness(.97); }
+  button.small { min-height:44px; padding:6px 14px; border-radius:10px; border:1px solid #d3ddd9; background:#fff; font-size:15px; font-weight:700; color:var(--ink); }
+  .step { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .step button { width:60px; height:60px; border-radius:14px; border:1.5px solid #d3ddd9; background:#fff; font-size:30px; font-weight:800; color:var(--ink); }
+  .step input[type=number] { width:120px; flex:none; height:60px; padding:0; text-align:center; font-size:30px; font-weight:900; border:2px solid var(--go-line); border-radius:14px; color:var(--ink); background:#fff; }
+  .step span { font-size:18px; font-weight:700; }
+  input[type=text], input[type=number], input[type=password], select { width:100%; height:54px; font-size:19px; padding:6px 12px; border:1.5px solid #cfd9d5; border-radius:12px; background:#fff; color:var(--ink); font-family:inherit; }
+  input:focus, select:focus { outline:none; border-color:var(--go); box-shadow:0 0 0 3px var(--go-soft); }
+  label.chk { display:flex; gap:12px; align-items:center; padding:14px; border:1.5px solid #cfd9d5; border-radius:12px; margin:12px 0; font-weight:800; background:#fff; }
+  label.chk input { width:26px; height:26px; accent-color:var(--red); }
+  label.chk.on { border-color:var(--red); background:var(--red-soft); color:var(--red-ink); }
+  .cand { display:block; width:100%; text-align:left; padding:12px 14px; margin:8px 0; border:1.5px solid var(--line); border-radius:14px; background:#fff; font-size:16px; color:var(--ink); }
+  .cand.sel { border:2px solid var(--go); background:var(--go-soft); box-shadow:0 0 0 3px rgba(18,128,79,.12); }
+  .cand .ch { display:flex; align-items:center; gap:4px 8px; flex-wrap:wrap; }
+  .cand .cq { font-size:16px; color:var(--ink2); }
+  .cand .cq b { font-size:20px; color:var(--ink); font-weight:900; font-variant-numeric:tabular-nums; }
+  /* 출발 → 도착 */
+  .route { display:flex; align-items:stretch; gap:8px; margin:4px 0 10px; }
+  .route .rb { flex:1; min-width:0; text-align:center; border:1.5px solid var(--line); border-radius:14px; padding:8px 6px; background:#f7faf9; }
+  .route .rb small { display:block; font-size:13px; font-weight:800; color:var(--mute); }
+  .route .rb b { display:block; font-size:34px; font-weight:900; letter-spacing:.5px; line-height:1.15; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .route .rb span { font-size:14px; font-weight:700; color:var(--ink2); }
+  .route .rb.to { border:2px solid var(--go); background:var(--go-soft); }
+  .route .rb.to b { color:var(--go-ink); }
+  .route .rb.q b { color:var(--mute); }
+  .route .ra { align-self:center; font-size:28px; font-weight:900; color:var(--go); }
+  /* 안내 상자 */
+  .sum { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:800; font-size:18px; }
+  .warn { background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; }
+  .warn .pb { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .err { background:var(--red-soft); color:var(--red-ink); border:1px solid var(--red-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:700; }
+  .ok { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:12px; padding:12px 14px; margin:10px 0; font-weight:800; font-size:18px; }
+  .muted, .sub { color:var(--mute); font-size:14px; }
+  .card p.sub { font-weight:600; font-size:14px; color:var(--mute); }
+  /* 알약 표시 (업무허브 .pill 과 같은 모양) — 안내 상자보다 뒤에 두어 크기가 덮이지 않게 */
+  .tag { display:inline-flex; align-items:center; margin:0 0 0 6px; padding:1px 9px; border-radius:999px; font-size:12.5px; font-weight:800; line-height:1.6; white-space:nowrap; vertical-align:2px;
+         background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); }
+  .tag.warn { background:var(--amber-soft); color:var(--amber-ink); border-color:var(--amber-line); }
+  .tag.wait { background:var(--gray-soft); color:#56645f; border-color:#dbe2df; }
+  .tag.bad { background:var(--red-soft); color:var(--red-ink); border-color:var(--red-line); }
+  /* 기록 줄 */
+  .rec { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+  .rec:first-of-type { border-top:0; }
+  .rec .rm { flex:1; min-width:0; }
+  .rec .rt { font-size:16px; font-weight:800; line-height:1.4; }
+  .rec .tm { font-size:14px; font-weight:700; color:var(--mute); margin-right:6px; font-variant-numeric:tabular-nums; }
+  .rec .rw { font-size:15px; color:var(--ink2); margin-top:4px; line-height:1.7; }
+  .rec .rw .lc { font-size:15px; }
+  .rec.cx { opacity:.55; }
+  .rec.cx .rt, .rec.cx .rw { text-decoration:line-through; }
+  .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .grid4 button { height:56px; font-size:21px; font-weight:900; border-radius:12px; border:1.5px solid #d3ddd9; background:#fff; color:var(--ink); }
+  .grid4 button.sel { border:2px solid var(--go); background:var(--go-soft); color:var(--go-ink); }
+  .foot { margin-top:24px; text-align:center; color:var(--mute); font-size:12px; }
   /* 11/12 김문수 님 "QR 찍고 들어가면 노란 안내가 나오며 칸이 밀려 잘못 눌림 — 아래쪽에 나오거나 안 나오게"
      → 화면 맨 아래에 고정(내용을 밀지 않음), 불러오는 동안은 안 띄움 */
-  #banner { position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--amber-soft); color:var(--amber); font-weight:700; font-size:14px;
-            padding:10px 14px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid #ecd29a; box-shadow:0 -2px 8px rgba(0,0,0,.06); }
+  #banner { position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--amber-soft); color:var(--amber-ink); font-weight:800; font-size:15px;
+            padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--amber-line); box-shadow:0 -2px 8px rgba(0,0,0,.06); }
   #banner.hide { display:none; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:10px 0; }
-  .card h3 { margin:0 0 6px; font-size:15px; color:var(--mute); font-weight:700; }
-  .item { padding:6px 0; border-top:1px solid var(--line); }
-  .item:first-of-type { border-top:0; }
-  .item b { font-size:18px; }
-  .sub { color:var(--mute); font-size:14px; }
-  .big { display:block; width:100%; min-height:58px; margin:10px 0; padding:12px 14px; border-radius:14px; border:2px solid var(--go);
-         background:var(--go); color:#fff; font-size:19px; font-weight:800; text-align:left; }
-  .big.alt { background:var(--card); color:var(--go); }
-  button.small { min-height:40px; padding:6px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:15px; color:var(--ink); }
-  .step { display:flex; align-items:center; gap:10px; margin:8px 0; }
-  .step button { width:58px; height:58px; border-radius:14px; border:1px solid var(--line); background:var(--card); font-size:28px; font-weight:700; color:var(--ink); }
-  .step input { width:100px; height:58px; text-align:center; font-size:28px; font-weight:800; border:2px solid var(--line); border-radius:14px; color:var(--ink); }
-  input[type=text], input[type=number], input[type=password], select { width:100%; height:52px; font-size:19px; padding:6px 10px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); }
-  label.chk { display:flex; gap:10px; align-items:center; padding:12px; border:2px solid var(--line); border-radius:12px; margin:10px 0; font-weight:700; }
-  label.chk input { width:26px; height:26px; }
-  label.chk.on { border-color:var(--red); background:var(--red-soft); color:var(--red); }
-  .cand { display:block; width:100%; text-align:left; padding:10px 12px; margin:8px 0; border:2px solid var(--line); border-radius:12px; background:#fff; font-size:16px; color:var(--ink); }
-  .cand.sel { border-color:var(--go); background:var(--go-soft); }
-  .tag { display:inline-block; font-size:12px; font-weight:800; padding:1px 7px; border-radius:20px; background:var(--go); color:#fff; margin-left:6px; }
-  .tag.warn { background:var(--amber); }
-  .tag.wait { background:#6b7280; }
-  .tag.bad { background:var(--red); }
-  .sum { background:var(--go-soft); color:var(--go); border-radius:12px; padding:10px 12px; font-weight:800; margin:10px 0; }
-  .warn { background:var(--amber-soft); color:var(--amber); border-radius:12px; padding:10px 12px; margin:10px 0; font-size:15px; }
-  .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 12px; margin:10px 0; font-weight:700; }
-  .ok { background:var(--go-soft); color:var(--go); border-radius:12px; padding:12px; margin:10px 0; font-weight:800; font-size:18px; }
-  .muted { color:var(--mute); font-size:14px; }
-  .rec { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:15px; }
-  .rec:first-of-type { border-top:0; }
-  .rec.cx { color:var(--mute); text-decoration:line-through; }
-  .rec button.small { flex:none; white-space:nowrap; }
-  .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
-  .grid4 button { height:52px; font-size:20px; font-weight:800; border-radius:12px; border:2px solid var(--line); background:#fff; color:var(--ink); }
-  .grid4 button.sel { border-color:var(--go); background:var(--go-soft); color:var(--go); }
-  .foot { margin-top:24px; text-align:center; color:var(--mute); font-size:12px; }
+  @media (max-width:360px) { .hero .hloc { font-size:42px; } .route .rb b { font-size:28px; } .pn { font-size:19px; } .big { font-size:18px; } }
 </style>
 </head>
 <body>
@@ -69,7 +149,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-13a';
+var VERSION = '2026-11-13b';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -247,17 +327,46 @@ function candidates(code, exceptFull) {
   return list.filter(function (c) { return !c.used; }).concat(list.filter(function (c) { return c.used; }));
 }
 
+// ---------------------------------------------------------------- 화면 조각 (2026-11-13 업무허브와 같은 모양)
+// 자리·제품명·LOT은 어느 화면에서나 같은 모양으로: 자리 = 초록 상자, 제품명 = 크고 굵게, LOT = 파란 상자
+var LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cf2b0"/><stop offset="1" stop-color="#16a66a"/></linearGradient></defs><path d="M24 4L44 42H33L24 24L15 42H4Z" fill="url(#lg1)"/><path d="M17 33h14" stroke="#ffffff" stroke-width="4"/></svg>';
+function lc(full, cls) { return '<span class="lc' + (cls ? ' ' + cls : '') + '">' + esc(shortOf(full)) + '</span>'; }
+function lvTag(level) { return '<span class="lv' + (level === 1 ? ' l1' : '') + '">' + level + '단</span>'; }
+function prodHead(code, name) { return '<div class="pn">' + esc(name || itemOf(code).name) + '</div><div class="pc">' + esc(code) + '</div>'; }
+function lotChips(lot, exp) {
+  if (!lot && !exp) return '';
+  return '<div class="ids">' + (lot ? '<span class="lot"><i>LOT</i>' + esc(lot) + '</span>' : '') + (exp ? '<span class="exp"><i>유통기한</i>' + esc(exp) + '</span>' : '') + '</div>';
+}
+// 그 자리에 있는 그 품목의 LOT (재고 현황 기준, 같은 LOT은 한 번만)
+function lotsAt(full, code) {
+  var seen = {}, o = '';
+  if (!S.data || !full) return '';
+  stockAt(full).forEach(function (r) { if (r.code === code && !seen[r.lot]) { seen[r.lot] = 1; o += lotChips(r.lot, r.exp); } });
+  return o;
+}
+function bigBtn(cls, on, ic, t, sub) {
+  return '<button class="big' + (cls ? ' ' + cls : '') + '" onclick="' + on + '"><span class="ic">' + ic + '</span><span class="bx">' + t +
+    (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
+}
+function hero(p) {
+  if (!p) return '<div class="hero"><div class="hl"><div class="hk">재고이동 기록</div><div class="hnone">자리 QR을 찍거나 아래에서 자리를 골라 주세요</div></div></div>';
+  return '<div class="hero"><div class="hl"><div class="hk">지금 자리</div><div class="hloc">' + esc(p.short) + '</div></div>' +
+    '<div class="hr">' + lvTag(p.level) + '<br>' + esc(p.row) + '줄 ' + p.bay + '번 칸<span class="full">' + esc(p.full) + '</span></div></div>';
+}
+
 // ---------------------------------------------------------------- 화면
 function render() {
   var h = '', p = parseLoc(S.loc);
-  h += '<div class="top"><div class="loc">' + (p ? esc(p.short) + '<small>' + p.level + '단</small>' : '재고이동 기록') + '</div>';
-  h += '<div class="who">' + (S.worker ? esc(S.worker) + ' · <a href="#" onclick="S.view=\'who\';S.msg=null;render();return false">바꾸기</a><br>' : '') + '<a href="diary.html">📝 업무일지</a></div></div>';
+  h += '<div class="bar">' + LOGO + '<div class="bt"><b>메디포스트</b><small>재고이동 · 오현물류</small></div>';
+  h += '<div class="who">' + (S.worker ? '<b>' + esc(S.worker) + '</b> · <a href="#" onclick="S.view=\'who\';S.msg=null;render();return false">바꾸기</a><br>' : '') + '<a href="diary.html">📝 업무일지</a></div></div>';
+  if (S.view !== 'who') h += hero(p);
   if (S.msg) h += '<div class="' + S.msg.t + '">' + esc(S.msg.s) + '</div>';
   var pd = S.view !== 'who' ? pendGet() : null;
   if (pd && S.view !== 'waitdest' && S.view !== 'confirmMove') {   // 옮기는 중인데 다른 화면에 있을 때
-    h += '<div class="warn"><b>➡ ' + esc(shortOf(pd.from)) + ' 파레트 옮기는 중</b> (' + esc(pd.name || pd.code) + ') — 넣은 자리 QR을 찍어 주세요 · ' + pendLeft(pd) + '분 남음' +
-      (p && p.full !== pd.from ? '<br><button class="small" style="margin-top:6px" onclick="S.view=\'confirmMove\';S.msg=null;render()">여기(' + esc(p.short) + ')에 넣었어요</button> ' : '<br>') +
-      '<button class="small" style="margin-top:6px" onclick="pendStop()">옮기기 그만</button></div>';
+    h += '<div class="warn"><b>➡ 파레트 옮기는 중</b> · ' + pendLeft(pd) + '분 남음<div style="margin:6px 0 2px;font-size:16px">' + lc(pd.from) + ' → ? · <b>' + esc(pd.name || pd.code) + '</b></div>' +
+      '넣은 자리 QR을 찍어 주세요<div class="pb">' +
+      (p && p.full !== pd.from ? '<button class="small" onclick="S.view=\'confirmMove\';S.msg=null;render()">여기(' + esc(p.short) + ')에 넣었어요</button>' : '') +
+      '<button class="small" onclick="pendStop()">옮기기 그만</button></div></div>';
   }
   if (S.view === 'who') h += viewWho();
   else if (!S.data) h += '<p class="muted">불러오는 중…</p>';
@@ -292,47 +401,47 @@ function saveWho() {
 
 function stockCard(p) {
   var rows = stockAt(p.full);
-  var h = '<div class="card"><h3>지금 이 자리' + (S.data.stockTime ? ' (재고 현황 ' + esc(String(S.data.stockTime).slice(5, 16).replace('T', ' ')) + ' 기준)' : '') + '</h3>';
+  var h = '<div class="card"><h3>📦 지금 이 자리 재고' + (S.data.stockTime ? ' <span class="when">' + esc(String(S.data.stockTime).slice(5, 16).replace('T', ' ')) + ' 재고 현황 기준</span>' : '') + '</h3>';
   if (!rows.length) h += '<div class="muted">재고 현황에는 빈 자리예요.</div>';
   rows.forEach(function (r) {
     var it = itemOf(r.code);
-    h += '<div class="item"><b>' + esc(r.name || it.name) + '</b> <span class="sub">' + esc(r.code) + '</span><br>' +
-      '<span class="sub">LOT ' + esc(r.lot) + ' · ' + esc(r.exp) + '</span><br>' + n(r.avail) + '개' +
-      (it.per ? ' <span class="sub">(약 ' + Math.ceil(r.avail / it.per) + '박스, 박스당 ' + it.per + ')</span>' : '') +
-      (r.stock !== r.avail ? ' <span class="sub">· 재고 ' + n(r.stock) + '</span>' : '') + '</div>';
+    h += '<div class="prod">' + prodHead(r.code, r.name || it.name) + lotChips(r.lot, r.exp) +
+      '<div class="qty"><b>' + n(r.avail) + '</b>개' + (it.per ? ' · 약 ' + Math.ceil(r.avail / it.per) + '박스 <span class="sub">(박스당 ' + it.per + ')</span>' : '') +
+      (r.stock !== r.avail ? ' <span class="sub">· 재고 ' + n(r.stock) + '</span>' : '') + '</div></div>';
   });
   return h + '</div>';
 }
 
 function recLine(r) {
   var t = r.time ? String(r.time).slice(11, 16) : '';
+  var cnt = esc((r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : ''));
   var what = r.kind === 'pick'
-    ? shortOf(r.loc) + ' → Picking ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '') + (r.empty ? ' ★재고X' : '')
-    : r.kind === 'back' ? 'Picking → ' + shortOf(r.loc) + ' 되돌림 ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '')
-    : shortOf(r.from) + ' → ' + shortOf(r.to) + ' 파레트';
+    ? lc(r.loc) + ' → <span class="lc pk">Picking</span> ' + cnt + (r.empty ? '<span class="tag bad">재고X</span>' : '')
+    : r.kind === 'back' ? '<span class="lc pk">Picking</span> → ' + lc(r.loc) + ' 되돌림 ' + cnt
+    : lc(r.from) + ' → ' + lc(r.to) + ' 파레트';
   var tag = r.status === '보내는 중' ? '<span class="tag wait">휴대폰에 저장</span>' : r.status === '새로' ? '<span class="tag wait">아직 안 보냄</span>'
     : r.status === '보냄' ? '<span class="tag">사무실로 보냄</span>' : r.status === '가져감' ? '<span class="tag">사무실 가져감</span>'
     : r.status === '안 들어감' ? '<span class="tag bad">안 들어감</span>' : '';
   var can = (r.status === '새로' || r.status === '보내는 중') && r.worker === S.worker;
-  return '<div class="rec' + (r.status === '취소' || r.status === '안 들어감' ? ' cx' : '') + '"><div>' + esc(t) + ' ' + esc(r.name || r.code) + tag + '<br><span class="sub">' +
-    esc(what) + ' · ' + esc(r.worker) + (r.error ? ' · ' + esc(r.error) : '') + '</span></div>' +
+  return '<div class="rec' + (r.status === '취소' || r.status === '안 들어감' ? ' cx' : '') + '"><div class="rm"><div class="rt"><span class="tm">' + esc(t) + '</span>' + esc(r.name || r.code) + tag + '</div>' +
+    '<div class="rw">' + what + ' · ' + esc(r.worker) + (r.error ? ' · ' + esc(r.error) : '') + '</div></div>' +
     (can ? '<button class="small" onclick="cancelRec(\'' + esc(r.id) + '\')">취소</button>' : '') + '</div>';
 }
 
 function viewLoc(p) {
   var rows = stockAt(p.full);
   var h = stockCard(p);
-  h += '<button class="big" onclick="startPick()">📦 Picking으로 꺼냈어요</button>';
-  h += '<button class="big alt" onclick="startRefill()">⬇ 2·3단 파레트를 여기로 내렸어요</button>';
-  if (rows.length) h += '<button class="big alt" onclick="startMoveTo()">➡ 이 자리 파레트를 다른 자리로 옮겼어요 <span style="font-weight:600;font-size:14px">(넣은 자리 QR 찍기)</span></button>';
-  h += '<button class="big alt" onclick="startBack()">↩ Picking에서 여기로 되돌려 넣었어요 <span style="font-weight:600;font-size:14px">(피킹존 자리 없을 때)</span></button>';
+  h += bigBtn('', 'startPick()', '📦', 'Picking으로 꺼냈어요');
+  h += bigBtn('alt', 'startRefill()', '⬇', '2·3단 파레트를 여기로 내렸어요');
+  if (rows.length) h += bigBtn('alt', 'startMoveTo()', '➡', '이 자리 파레트를 다른 자리로 옮겼어요', '넣은 자리 QR 찍기');
+  h += bigBtn('alt', 'startBack()', '↩', 'Picking에서 여기로 되돌려 넣었어요', '피킹존 자리 없을 때');
   var recs = todayAt(p.full);
   if (recs.length) {
-    h += '<div class="card"><h3>오늘 이 자리 기록</h3>';
+    h += '<div class="card"><h3>🕘 오늘 이 자리 기록</h3>';
     recs.forEach(function (r) { h += recLine(r); });
     h += '</div>';
   }
-  h += '<button class="small" onclick="S.view=\'choose\';S.msg=null;render()">다른 자리 고르기 · 오늘 내 기록</button>';
+  h += bigBtn('gray', 'S.view=\'choose\';S.msg=null;render()', '🔎', '다른 자리 고르기 · 오늘 내 기록');
   h += myCard();
   return h;
 }
@@ -346,11 +455,11 @@ function myCard() {
   var un = unsent();
   var sent = mine.filter(function (r) { return r.status === '보냄'; }).length, taken = mine.filter(function (r) { return r.status === '가져감'; }).length;
   if (!un.length && !sent && !taken) return '';
-  var h = '<div class="card" style="margin-top:16px;border:2px solid ' + (un.length ? 'var(--amber)' : 'var(--line)') + '"><h3>📋 오늘 내 이동 — 아직 안 보낸 ' + un.length + '건</h3>';
+  var h = '<div class="card mine' + (un.length ? ' un' : '') + '" style="margin-top:16px"><h3>📋 오늘 내 이동 ' + (un.length ? '<span class="tag warn">아직 안 보낸 ' + un.length + '건</span>' : '') + '</h3>';
   if (!un.length) h += '<div class="muted">안 보낸 기록이 없어요</div>';
   un.forEach(function (r) { h += recLine(r); });
   h += '<div class="sub" style="margin-top:6px">사무실로 보냄 ' + sent + '건 · 사무실 가져감 ' + taken + '건</div></div>';
-  if (un.length) h += '<button class="big" onclick="sendAll()">📤 이동 끝 — 사무실로 보내기 (' + un.length + '건)</button>' +
+  if (un.length) h += bigBtn('', 'sendAll()', '📤', '이동 끝 — 사무실로 보내기 (' + un.length + '건)') +
     '<div class="muted" style="margin:-4px 2px 10px">보내면 1~2분 안에 사무실에 업로드 파일과 메일이 만들어져요. 보낸 뒤에는 휴대폰에서 취소할 수 없어요.</div>';
   return h;
 }
@@ -378,10 +487,18 @@ function sendAll(auto) {
 }
 function sendIfWanted() { if (lsGet('mm_send_wanted') && S.data && !outbox().length && !inflight) sendAll(true); }
 
-function productPicker(codes, sel) {
+// lotFull: 그 자리에서 꺼내는 파레트일 때만 넘김 → 그 자리 LOT을 같이 보여 줌 (내려 넣은·되돌린 자리는 LOT이 다를 수 있어 안 보여 줌)
+function productPicker(codes, sel, lotFull) {
   var list = codes.length ? codes.map(itemOf) : (S.data.items || []).slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
-  if (codes.length === 1) return '<div class="item"><b>' + esc(list[0].name) + '</b> <span class="sub">' + esc(list[0].code) + '</span></div>';
-  var h = '<p class="sub">' + (codes.length ? '이 자리에 품목이 여러 개예요. 옮긴 품목을 골라 주세요' : '재고 현황에 없는 자리예요. 품목을 골라 주세요') + '</p>';
+  if (codes.length === 1) return '<div class="prod">' + prodHead(list[0].code, list[0].name) + lotsAt(lotFull, list[0].code) + '</div>';
+  if (codes.length) {   // 이 자리 품목이 여러 개 → 크게 눌러 고르기
+    var b = '<p class="sub">이 자리에 품목이 여러 개예요. 옮긴 품목을 눌러 주세요</p>';
+    list.forEach(function (it) {
+      b += '<button class="cand' + (it.code === sel ? ' sel' : '') + '" onclick="S.form.code=\'' + esc(it.code) + '\';render()">' + prodHead(it.code, it.name) + lotsAt(lotFull, it.code) + '</button>';
+    });
+    return b;
+  }
+  var h = '<p class="sub">재고 현황에 없는 자리예요. 품목을 골라 주세요</p>';
   h += '<select id="fCode" onchange="S.form.code=this.value;render()"><option value="">— 품목 고르기 —</option>';
   list.forEach(function (it) { h += '<option value="' + esc(it.code) + '"' + (it.code === sel ? ' selected' : '') + '>' + esc(it.name) + ' (' + esc(it.code) + ')</option>'; });
   return h + '</select>';
@@ -397,7 +514,7 @@ function viewPick(p) {
   var f = S.form, it = f.code ? itemOf(f.code) : null;
   S._avail = f.code ? stockAt(p.full).filter(function (r) { return r.code === f.code; }).reduce(function (a, r) { return a + r.avail; }, 0) : 0;
   S._per = it ? it.per : 0;
-  var h = '<div class="card"><h3>📦 Picking으로 꺼냈어요</h3>' + productPicker(f.codes, f.code);
+  var h = '<div class="card"><h3>📦 ' + lc(p.full) + ' → Picking으로 꺼냈어요</h3>' + productPicker(f.codes, f.code, p.full);
   h += '<p>꺼낸 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
     '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
     '<button onclick="bump(1)">+</button><span>박스</span></div>';
@@ -407,7 +524,7 @@ function viewPick(p) {
     ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
     : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
   h += '<div id="fSum"></div></div>';
-  h += '<button class="big" onclick="savePick()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  h += bigBtn('', 'savePick()', '✓', '저장') + bigBtn('gray', 'back()', '←', '뒤로');
   setTimeout(sumUpd, 0);
   return h;
 }
@@ -446,20 +563,20 @@ function startRefill() {
 }
 function viewRefill(p) {
   var f = S.form;
-  var h = '<div class="card"><h3>⬇ 여기(' + esc(p.short) + ')로 파레트를 내렸어요</h3>' + productPicker(f.codes, f.code);
+  var h = '<div class="card"><h3>⬇ 2·3단 파레트를 ' + lc(p.full) + '에 내렸어요</h3>' + productPicker(f.codes, f.code);
   if (f.code) {
     var c = candidates(f.code, p.full);
     h += '<p>어느 자리 파레트를 내렸어요?</p>';
     if (!c.length) h += '<div class="muted">재고 현황에 같은 품목 2·3단 파레트가 없어요. 아래에 자리를 직접 넣어 주세요.</div>';
     c.forEach(function (x, i) {
       h += '<button class="cand' + (f.from === x.loc ? ' sel' : '') + '" onclick="S.form.from=\'' + esc(x.loc) + '\';S.form.typed=\'\';render()">' +
-        '<b>' + esc(shortOf(x.loc)) + '</b> · ' + n(x.avail) + '개' + (i === 0 && !x.used ? '<span class="tag">추천</span>' : '') +
-        (x.used ? '<span class="tag warn">오늘 이미 옮김</span>' : '') + '<br><span class="sub">LOT ' + esc(x.lot) + ' · ' + esc(x.exp) + '</span></button>';
+        '<div class="ch">' + lc(x.loc, 'xl') + '<span class="cq"><b>' + n(x.avail) + '</b>개</span>' + (i === 0 && !x.used ? '<span class="tag">추천</span>' : '') +
+        (x.used ? '<span class="tag warn">오늘 이미 옮김</span>' : '') + '</div>' + lotChips(x.lot, x.exp) + '</button>';
     });
     h += '<p class="sub">목록에 없으면 자리 직접 넣기 (예: M2-28)</p><input type="text" id="fTyped" value="' + esc(f.typed) +
       '" oninput="S.form.typed=this.value.toUpperCase();S.form.from=\'\'" autocapitalize="characters" placeholder="M2-28">';
   }
-  h += '</div><button class="big" onclick="saveRefill()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  h += '</div>' + bigBtn('', 'saveRefill()', '✓', '저장') + bigBtn('gray', 'back()', '←', '뒤로');
   return h;
 }
 function saveRefill() {
@@ -482,7 +599,7 @@ function startBack() {
 function viewBack(p) {
   var f = S.form, it = f.code ? itemOf(f.code) : null;
   S._avail = 0; S._per = it ? it.per : 0;
-  var h = '<div class="card"><h3>↩ Picking에서 ' + esc(p.short) + '(으)로 되돌려 넣었어요</h3>' +
+  var h = '<div class="card"><h3>↩ Picking → ' + lc(p.full) + ' 되돌려 넣었어요</h3>' +
     '<div class="muted" style="margin-bottom:6px">피킹존에 둘 자리가 없어서 Bulk로 다시 넣을 때만 써요.</div>' + productPicker(f.codes, f.code);
   h += '<p>되돌린 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
     '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
@@ -491,7 +608,7 @@ function viewBack(p) {
     ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
     : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
   h += '<div id="fSum"></div></div>';
-  h += '<button class="big" onclick="saveBack()">저장</button><button class="big alt" onclick="back()">뒤로</button>';
+  h += bigBtn('', 'saveBack()', '✓', '저장') + bigBtn('gray', 'back()', '←', '뒤로');
   setTimeout(sumUpd, 0);
   return h;
 }
@@ -511,14 +628,14 @@ function startMoveTo() {
 }
 function viewMoveTo(p) {
   var f = S.form;
-  return '<div class="card"><h3>➡ ' + esc(p.short) + ' 파레트를 다른 자리로 옮겼어요</h3>' + productPicker(f.codes, f.code) + '</div>' +
-    '<button class="big" onclick="beginScan()">📷 넣은 자리 QR 찍기</button>' +
+  return '<div class="card"><h3>➡ ' + lc(p.full) + ' 파레트를 다른 자리로 옮겼어요</h3>' + productPicker(f.codes, f.code, p.full) + '</div>' +
+    bigBtn('', 'beginScan()', '📷', '넣은 자리 QR 찍기') +
     '<div class="muted" style="margin:-2px 2px 8px">누르고 나서 휴대폰 카메라로 파레트를 넣은 자리의 QR을 찍으면 확인 화면이 떠요 (' + PEND_MIN + '분 안)</div>' +
-    '<details class="card"><summary class="sub">QR이 안 찍힐 때: 넣은 자리 직접 넣기</summary>' +
+    '<details class="card"><summary>QR이 안 찍힐 때: 넣은 자리 직접 넣기</summary>' +
     '<p>넣은 자리 (예: M1-15)</p><input type="text" id="fTo" value="' + esc(f.typed) +
     '" oninput="S.form.typed=this.value.toUpperCase()" autocapitalize="characters" placeholder="M1-15">' +
-    '<button class="big alt" onclick="saveMoveTo()">이 자리로 저장</button></details>' +
-    '<button class="big alt" onclick="back()">뒤로</button>';
+    bigBtn('alt', 'saveMoveTo()', '✓', '이 자리로 저장') + '</details>' +
+    bigBtn('gray', 'back()', '←', '뒤로');
 }
 function beginScan() {
   var f = S.form, p = parseLoc(S.loc);
@@ -528,26 +645,29 @@ function beginScan() {
 }
 function viewWaitDest() {
   var pd = pendGet();
-  if (!pd) return '<div class="card">옮기는 중인 파레트가 없어요 (' + PEND_MIN + '분이 지났거나 저장·취소했어요).</div><button class="big alt" onclick="back()">돌아가기</button>';
-  return '<div class="card" style="border:2px solid var(--go)"><h3>➡ 옮기는 중 · ' + pendLeft(pd) + '분 남음</h3>' +
-    '<div style="font-size:24px;font-weight:800">' + esc(shortOf(pd.from)) + ' → <span style="color:var(--go)">?</span></div>' +
-    '<div class="item"><b>' + esc(pd.name || pd.code) + '</b> <span class="sub">' + esc(pd.code) + '</span></div>' +
+  if (!pd) return '<div class="card">옮기는 중인 파레트가 없어요 (' + PEND_MIN + '분이 지났거나 저장·취소했어요).</div>' + bigBtn('gray', 'back()', '←', '돌아가기');
+  var from = parseLoc(pd.from);
+  return '<div class="card hot"><h3>➡ 옮기는 중 <span class="tag warn">' + pendLeft(pd) + '분 남음</span></h3>' +
+    '<div class="route"><div class="rb"><small>출발</small><b>' + esc(shortOf(pd.from)) + '</b><span>' + (from ? from.level + '단' : '') + '</span></div>' +
+    '<div class="ra">→</div><div class="rb q"><small>넣은 자리</small><b>?</b><span>QR 찍기</span></div></div>' +
+    '<div class="prod">' + prodHead(pd.code, pd.name) + lotsAt(pd.from, pd.code) + '</div>' +
     '<div class="ok" style="font-size:17px">📷 이제 휴대폰 카메라로 <b>파레트를 넣은 자리의 QR</b>을 찍어 주세요</div></div>' +
-    '<button class="big alt" onclick="S.view=\'choose\';S.msg=null;render()">QR이 안 찍히면: 넣은 자리 고르기</button>' +
-    '<button class="big alt" onclick="pendStop()">옮기기 그만</button>';
+    bigBtn('alt', 'S.view=\'choose\';S.msg=null;render()', '🔎', 'QR이 안 찍히면: 넣은 자리 고르기') +
+    bigBtn('gray', 'pendStop()', '✕', '옮기기 그만');
 }
 function viewConfirmMove(p) {
-  var pd = pendGet(), here = stockAt(p.full);
+  var pd = pendGet(), here = stockAt(p.full), from = parseLoc(pd.from);
   var other = here.filter(function (r) { return r.code !== pd.code; });
-  var h = '<div class="card" style="border:2px solid var(--go)"><h3>이렇게 옮겼어요?</h3>' +
-    '<div style="font-size:30px;font-weight:900;line-height:1.2">' + esc(shortOf(pd.from)) + ' → <span style="color:var(--go)">' + esc(p.short) + '</span></div>' +
-    '<div class="sub">' + esc(String(parseLoc(pd.from).level)) + '단 → ' + p.level + '단 · 파레트 통째로</div>' +
-    '<div class="item"><b>' + esc(pd.name || pd.code) + '</b> <span class="sub">' + esc(pd.code) + '</span></div>';
+  var h = '<div class="card hot"><h3>이렇게 옮겼어요?</h3>' +
+    '<div class="route"><div class="rb"><small>출발</small><b>' + esc(shortOf(pd.from)) + '</b><span>' + (from ? from.level + '단' : '') + '</span></div>' +
+    '<div class="ra">→</div><div class="rb to"><small>넣은 자리</small><b>' + esc(p.short) + '</b><span>' + p.level + '단</span></div></div>' +
+    '<div class="sub" style="text-align:center;margin:-4px 0 8px">파레트 통째로</div>' +
+    '<div class="prod">' + prodHead(pd.code, pd.name) + lotsAt(pd.from, pd.code) + '</div>';
   if (other.length) h += '<div class="warn">이 자리(' + esc(p.short) + ')에 다른 품목이 있어요: ' + esc(other.map(function (r) { return r.name || itemOf(r.code).name; }).join(', ')) + ' — 맞는지 확인해 주세요 (한 자리 한 제품)</div>';
   else if (here.length) h += '<div class="muted">이 자리에 같은 품목이 이미 있어요 (재고 현황 기준).</div>';
-  h += '</div><button class="big" onclick="saveConfirmMove()">✓ 저장</button>' +
-    '<button class="big alt" onclick="S.view=\'waitdest\';S.msg=null;render()">다른 자리예요 — 다시 찍기</button>' +
-    '<button class="big alt" onclick="pendStop()">옮기기 그만</button>';
+  h += '</div>' + bigBtn('', 'saveConfirmMove()', '✓', '저장') +
+    bigBtn('alt', 'S.view=\'waitdest\';S.msg=null;render()', '📷', '다른 자리예요 — 다시 찍기') +
+    bigBtn('gray', 'pendStop()', '✕', '옮기기 그만');
   return h;
 }
 function saveConfirmMove() {
@@ -599,19 +719,19 @@ function back() { S.view = 'loc'; S.form = null; S.msg = null; render(); }
 // ---- 자리 고르기 (QR이 없거나 안 찍힐 때) · 오늘 내 기록
 function viewChoose() {
   var c = S.choose || (S.choose = { row: '', level: 1, bay: '' });
-  var h = '<div class="card"><h3>자리 고르기 (QR을 찍으면 바로 열려요)</h3><p class="sub">줄</p><div class="grid4">';
+  var h = '<div class="card"><h3>🔎 자리 고르기 <span class="when">QR을 찍으면 바로 열려요</span></h3><p>줄</p><div class="grid4">';
   ROWS.forEach(function (r) { h += '<button class="' + (c.row === r ? 'sel' : '') + '" onclick="S.choose.row=\'' + r + '\';render()">' + r + '</button>'; });
-  h += '</div><p class="sub">단</p><div class="grid4">';
+  h += '</div><p>단</p><div class="grid4">';
   [1, 2, 3].forEach(function (l) { h += '<button class="' + (c.level === l ? 'sel' : '') + '" onclick="S.choose.level=' + l + ';render()">' + l + '단</button>'; });
-  h += '</div><p class="sub">칸 번호</p><input type="number" inputmode="numeric" id="cBay" value="' + esc(c.bay) + '" oninput="S.choose.bay=this.value" placeholder="예: 9">';
-  h += '<button class="big" onclick="openChosen()">이 자리 열기</button></div>';
+  h += '</div><p>칸 번호</p><input type="number" inputmode="numeric" id="cBay" value="' + esc(c.bay) + '" oninput="S.choose.bay=this.value" placeholder="예: 9">';
+  h += bigBtn('', 'openChosen()', '📍', '이 자리 열기') + '</div>';
   var mine = S.data.log.filter(function (r) { return r.worker === S.worker; });
-  h += '<div class="card"><h3>오늘 내 기록 (' + mine.filter(function (r) { return r.status !== '취소' && r.status !== '안 들어감'; }).length + '건)</h3>';
+  h += '<div class="card"><h3>🕘 오늘 내 기록 (' + mine.filter(function (r) { return r.status !== '취소' && r.status !== '안 들어감'; }).length + '건)</h3>';
   if (!mine.length) h += '<div class="muted">아직 없어요</div>';
   mine.slice().reverse().forEach(function (r) { h += recLine(r); });
   h += '</div>';
-  if (unsent().length) h += '<button class="big" onclick="sendAll()">📤 이동 끝 — 사무실로 보내기 (' + unsent().length + '건)</button>';
-  if (parseLoc(S.loc)) h += '<button class="big alt" onclick="back()">' + esc(parseLoc(S.loc).short) + '(으)로 돌아가기</button>';
+  if (unsent().length) h += bigBtn('', 'sendAll()', '📤', '이동 끝 — 사무실로 보내기 (' + unsent().length + '건)');
+  if (parseLoc(S.loc)) h += bigBtn('gray', 'back()', '←', esc(parseLoc(S.loc).short) + '(으)로 돌아가기');
   return h;
 }
 function openChosen() {

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f7f6">
+<meta name="robots" content="noindex">
+<title>메디포스트 자동화 (데이터)</title>
+<style>
+  /* 2026-11-13 휴대폰 원격 조종 — 와이파이 없이 데이터로 (구글 중계). 화면 판: ctl-2026-11-13a
+     휴대폰 → 구글 웹앱(Code.gs v6 ctl_) → 사무실 PC(업무허브 mobile_gate.py)가 몇 초마다 받아서 실행
+     밝은 바탕·흰 카드 (사장님: 까만 배경 싫어함) */
+  :root { --bg:#f4f7f6; --card:#ffffff; --ink:#222826; --ink2:#55605c; --line:#dfe6e3; --g:#1f8a5b; --g-soft:#e6f4ed;
+          --amber:#9a6200; --amber-soft:#fff4dc; --red:#c0362c; --red-soft:#fdecea; --blue:#1d5fa8; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+         -webkit-text-size-adjust:100%; padding:0 14px calc(28px + env(safe-area-inset-bottom)); }
+  header { position:sticky; top:0; z-index:5; background:var(--bg); padding:14px 0 10px; display:flex; align-items:center; gap:8px; }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  .muted { color:var(--ink2); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:0 0 12px; }
+  .card h2 { font-size:15px; margin:0 0 8px; }
+  .badge { display:inline-block; border-radius:999px; padding:3px 10px; font-size:13px; margin:2px 4px 2px 0; }
+  .ok { background:var(--g-soft); color:var(--g); } .warn { background:var(--amber-soft); color:var(--amber); } .bad { background:var(--red-soft); color:var(--red); }
+  button { font:inherit; border-radius:12px; border:1px solid var(--line); background:#fff; color:var(--ink); padding:14px 12px; min-height:52px; width:100%; cursor:pointer; }
+  button:active { transform:scale(.98); }
+  button:disabled { opacity:.5; }
+  .pri { background:var(--g); border-color:var(--g); color:#fff; font-weight:700; }
+  .stop { background:var(--red); border-color:var(--red); color:#fff; font-weight:700; font-size:18px; }
+  .grid { display:grid; grid-template-columns:1fr; gap:8px; }
+  .q { border:2px solid #e8b04a; background:var(--amber-soft); }
+  .q .text { white-space:pre-wrap; background:#fff; border-radius:10px; padding:12px; margin:8px 0 12px; font-size:15px; max-height:50vh; overflow:auto; }
+  .q .btns { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .q .btns.one { grid-template-columns:1fr; }
+  .log { font-size:13px; color:var(--ink2); white-space:pre-wrap; word-break:break-all; border-top:1px dashed var(--line); padding-top:6px; margin-top:6px; }
+  .log.stop { color:var(--red); }
+  .row { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  input { font:inherit; font-size:24px; letter-spacing:6px; text-align:center; width:100%; padding:14px; border:1px solid var(--line); border-radius:12px; margin:8px 0 12px; }
+  #toast { position:fixed; left:14px; right:14px; bottom:calc(16px + env(safe-area-inset-bottom)); background:#2f3a36; color:#fff; padding:12px 14px; border-radius:12px; display:none; z-index:9; }
+  .hidden { display:none !important; }
+  a { color:var(--blue); }
+</style>
+</head>
+<body>
+<header><h1>메디포스트 자동화 <span class="muted">· 데이터</span></h1><span class="muted" id="clock">-</span></header>
+
+<section id="login" class="card hidden">
+  <h2>PIN을 넣어 주세요</h2>
+  <div class="muted" id="loginNote">사무실 PC에서 정한 '데이터용' PIN (6~8자리)</div>
+  <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" aria-label="PIN">
+  <button class="pri" id="loginBtn">들어가기</button>
+</section>
+
+<main id="app" class="hidden">
+  <div id="pcState"></div>
+  <section id="qCard" class="card q hidden">
+    <h2 id="qTitle">PC에 뜬 안내창</h2>
+    <div class="muted" id="qTime"></div>
+    <div class="text" id="qText"></div>
+    <div class="btns" id="qBtns"></div>
+  </section>
+
+  <section class="card">
+    <h2>지금</h2>
+    <div id="running"></div>
+    <div id="done"></div>
+    <div id="logs"></div>
+  </section>
+
+  <section class="card">
+    <h2>오늘 차수</h2>
+    <div id="rounds" class="muted">읽는 중…</div>
+    <div id="miss"></div>
+  </section>
+
+  <section class="card">
+    <h2>자동화 실행 <span class="muted">(사무실 PC에서 실제실행)</span></h2>
+    <div class="muted" style="margin-bottom:8px">PC가 4~20초 안에 받아서 해요. PC가 켜져 있고 화면 잠금이 풀려 있어야 해요.</div>
+    <div class="grid" id="tools"></div>
+  </section>
+
+  <section class="card">
+    <button class="stop" id="stopBtn">⛔ 자동화 긴급정지</button>
+  </section>
+
+  <div class="muted" style="text-align:center">
+    <span id="upd"></span> · <a href="#" id="logout">나가기</a>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const CFG = window.MEDI_MOVE_CONFIG || {};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SKEY = "medi_ctl_sess";
+let busy = false, lastQ = "", timer = null, toolsDrawn = false;
+
+function sess() { try { const s = JSON.parse(localStorage.getItem(SKEY) || "null"); return s && s.exp > Date.now() ? s.s : ""; } catch (_) { return ""; } }
+function setSess(s, hours) { try { localStorage.setItem(SKEY, JSON.stringify({s, exp: Date.now() + hours * 3600e3 - 60e3})); } catch (_) {} }
+function clearSess() { try { localStorage.removeItem(SKEY); } catch (_) {} }
+
+async function g(body) {
+  if (!CFG.apiUrl) throw new Error("config.js에 구글 웹앱 주소가 없어요");
+  const r = await fetch(CFG.apiUrl, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(body), redirect: "follow"});
+  const j = await r.json().catch(() => ({ok: false, error: "구글 답을 읽지 못했어요"}));
+  if (j.error === "login") { clearSess(); showLogin("다시 들어가 주세요 (6시간이 지났거나 PIN이 바뀜)"); throw new Error("login"); }
+  if (!j.ok) throw new Error(j.error || "실패");
+  return j;
+}
+function toast(msg, ms = 3500) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", ms); }
+function showLogin(note) { $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); if (note) $("#loginNote").textContent = note; clearInterval(timer); timer = null; }
+function showApp() { $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); refresh(); if (!timer) timer = setInterval(refresh, 4000); }
+
+$("#loginBtn").onclick = async () => {
+  const pin = $("#pin").value.trim();
+  if (!pin) return;
+  $("#loginBtn").disabled = true;
+  try { const r = await g({ctl: "login", pin}); setSess(r.sess, r.hours || 6); $("#pin").value = ""; showApp(); }
+  catch (e) { if (e.message !== "login") $("#loginNote").textContent = e.message; }
+  finally { $("#loginBtn").disabled = false; }
+};
+$("#pin").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+$("#logout").onclick = async e => { e.preventDefault(); try { await g({ctl: "logout", sess: sess()}); } catch (_) {} clearSess(); showLogin("나갔어요"); };
+
+const TOOLS = {
+  wms0_commit: "재고이동 넣기 (B2B·쿠팡·퀵, 끝나면 1단계로)", wms_commit: "1단계 발주 등록 (→ 2·3단계 자동)",
+  wms2_commit: "2단계 운송장 배정 (→ 3단계 자동)", wms3_commit: "3단계 피킹접수 → 운송장 엑셀",
+  wms3_export: "운송장 엑셀만", wms4_commit: "4단계 배송확정 → 거래명세서",
+};
+
+function render(r) {
+  const s = r.snap || {}, age = r.age;
+  $("#clock").textContent = s.at || "";
+  $("#upd").textContent = "PC 정보 " + (age == null ? "없음" : age + "초 전") + " · 4초마다 새로고침";
+  const pc = s.pc || {}, b = [];
+  if (age == null || age > 90) b.push(`<span class="badge bad">사무실 PC 소식이 ${age == null ? "없어요" : Math.round(age / 60) + "분째 없어요"} — PC·업무허브가 꺼졌거나 인터넷이 끊김</span>`);
+  if (s.error) b.push(`<span class="badge bad">${esc(s.error)}</span>`);
+  if (pc.locked) b.push(`<span class="badge bad">PC 화면 잠김 — 자동화가 EMP를 못 눌러요</span>`);
+  else if (pc.locked === false) b.push(`<span class="badge ok">PC 화면 열림</span>`);
+  if (pc.emp === false) b.push(`<span class="badge warn">EMP 꺼짐</span>`); else if (pc.emp) b.push(`<span class="badge ok">EMP 켜짐</span>`);
+  if (r.queued) b.push(`<span class="badge warn">PC로 보낼 명령 ${r.queued}개 기다리는 중</span>`);
+  $("#pcState").innerHTML = b.length ? `<div style="margin-bottom:10px">${b.join("")}</div>` : "";
+  const q = s.question;
+  $("#qCard").classList.toggle("hidden", !q);
+  if (q) {
+    if (q.id !== lastQ) { lastQ = q.id; if (navigator.vibrate) navigator.vibrate(200); }
+    $("#qTitle").textContent = q.title || "PC에 뜬 안내창";
+    $("#qTime").textContent = (q.time || "").slice(11, 19) + " · PC에서 눌러도 돼요";
+    $("#qText").textContent = q.text || "";
+    $("#qBtns").className = "btns" + (q.yesno ? "" : " one");
+    $("#qBtns").innerHTML = q.yesno ? `<button class="pri" data-a="yes">예</button><button data-a="no">아니요</button>` : `<button class="pri" data-a="yes">확인</button>`;
+    $("#qBtns").querySelectorAll("button").forEach(x => x.onclick = () => answer(q.id, x.dataset.a, x));
+  }
+  const run = s.running;
+  $("#running").innerHTML = run ? `<span class="badge warn">● ${esc(run.step)} 도는 중 (${esc(run.start)}부터${run.handoff ? " · 다음 단계로 넘기는 중" : ""})</span>`
+                                : (s.at ? `<span class="badge ok">쉬는 중 — 도는 자동화 없음</span>` : "");
+  $("#done").innerHTML = (r.done || []).slice(0, 3).map(d => `<div class="muted">${esc(d.at)} ${d.ok ? "✓" : "✗"} ${esc(d.msg)}</div>`).join("");
+  $("#logs").innerHTML = (s.logs || []).map(l => `<div class="log${l.stop ? " stop" : ""}"><b>${esc(l.step)}</b> ${esc(l.time)}${l.stop ? " · 멈춤" : ""}\n${(l.lines || []).map(esc).join("\n")}</div>`).join("")
+    || `<div class="muted">오늘 자동화 기록이 아직 없어요</div>`;
+  const rs = s.rounds || [];
+  $("#rounds").innerHTML = rs.length ? rs.slice().reverse().map(x => {
+    const m = x.marks || {}, tags = [];
+    if (m.manual) tags.push(`<span class="badge ok">수기</span>`);
+    if (m.confirm) tags.push(`<span class="badge ok">배송확정</span>`);
+    if (m.invoice) tags.push(`<span class="badge ok">명세서</span>`);
+    return `<div class="row"><div><b>${esc(x.name)}</b> <span class="muted">${esc(x.kind || "")} · ${esc(x.time || "")}</span><div>${tags.join("")}</div></div><div class="muted" style="white-space:nowrap">${x.reqs ?? "-"}건 · ${x.qty ?? "-"}개</div></div>`;
+  }).join("") : (s.at ? "오늘 발주 파일이 아직 없어요" : "PC 정보를 기다리는 중…");
+  const mn = (s.miss || []).reduce((a, x) => a + x.missing.length, 0);
+  $("#miss").innerHTML = mn ? `<div class="badge warn" style="margin-top:8px">지난 차수 확인할 단계 ${mn}개 — PC 대시보드에서 확인</div>` : "";
+  if (!toolsDrawn) {
+    toolsDrawn = true;
+    $("#tools").innerHTML = Object.entries(TOOLS).map(([k, v]) => `<button data-t="${esc(k)}">${esc(v)}</button>`).join("");
+    $("#tools").querySelectorAll("button").forEach(x => x.onclick = () => runTool(x.dataset.t, x.textContent, x));
+  }
+}
+
+async function refresh() {
+  if (busy || document.hidden) return;
+  busy = true;
+  try { render(await g({ctl: "state", sess: sess()})); }
+  catch (e) { if (e.message !== "login") toast("연결이 안 돼요: " + e.message); }
+  finally { busy = false; }
+}
+async function answer(qid, a, btn) {
+  btn.disabled = true;
+  try { await g({ctl: "answer", sess: sess(), qid, answer: a}); toast("보냈어요 — PC가 몇 초 안에 받아서 안내창을 닫아요"); setTimeout(refresh, 3000); }
+  catch (e) { if (e.message !== "login") toast(e.message); btn.disabled = false; }
+}
+async function runTool(t, name, btn) {
+  if (!confirm(`사무실 PC에서 실행할까요?\n\n${name}\n\nPC가 몇 초 안에 받아서 시작해요. EMP가 켜져 있고 PC 화면 잠금이 풀려 있어야 해요.`)) return;
+  btn.disabled = true;
+  try { await g({ctl: "run", sess: sess(), tool: t}); toast("보냈어요 — PC가 받으면 '지금' 아래에 결과가 나와요", 5000); setTimeout(refresh, 3000); }
+  catch (e) { if (e.message !== "login") toast(e.message, 5000); }
+  finally { setTimeout(() => btn.disabled = false, 6000); }
+}
+$("#stopBtn").onclick = async () => {
+  if (!confirm("도는 자동화를 바로 멈출까요?\n(PC가 몇 초 안에 받아서 멈춰요. 다음 단계도 시작하지 않아요)")) return;
+  try { await g({ctl: "stop", sess: sess()}); toast("긴급정지를 보냈어요 — PC가 받으면 결과가 나와요", 5000); setTimeout(refresh, 3000); }
+  catch (e) { if (e.message !== "login") toast(e.message, 5000); }
+};
+document.addEventListener("visibilitychange", () => { if (!document.hidden && timer) refresh(); });
+sess() ? showApp() : showLogin();
+</script>
+</body>
+</html>

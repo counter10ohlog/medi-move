@@ -52,6 +52,7 @@
   .rec { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:15px; }
   .rec:first-of-type { border-top:0; }
   .rec.cx { color:var(--mute); text-decoration:line-through; }
+  .rec button.small { flex:none; white-space:nowrap; }
   .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
   .grid4 button { height:52px; font-size:20px; font-weight:800; border-radius:12px; border:2px solid var(--line); background:#fff; color:var(--ink); }
   .grid4 button.sel { border-color:var(--go); background:var(--go-soft); color:var(--go); }
@@ -68,7 +69,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-12b';
+var VERSION = '2026-11-13a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -126,7 +127,7 @@ pendRoute();
 function api(action, extra, keepalive) {
   if (!CFG.apiUrl) return Promise.reject({ code: 'setup', message: 'config.js에 구글 웹앱 주소가 아직 없어요 (사무실에 알려 주세요)' });
   var body = JSON.stringify(Object.assign({ action: action, pin: S.pin }, extra || {}));
-  var want = { phoneData: 'data', phoneSave: 'save', phoneCancel: 'cancel' }[action];
+  var want = { phoneData: 'data', phoneSave: 'save', phoneCancel: 'cancel', phoneSend: 'send' }[action];
   var attempt = 0;
   function once() {
     return fetch(CFG.apiUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, redirect: 'follow', keepalive: !!keepalive })
@@ -159,7 +160,7 @@ function load() {
     mergeOutbox();
     lsSet(K.cache, JSON.stringify(S.data));
     if (S.view === 'who') S.view = 'loc';
-    render(); flush();
+    render(); flush(); sendIfWanted();
   }).catch(function (e) {
     if (e.code === 'pin') return pinFail();
     S.fresh = false; S.loadFailed = true;   // 받기에 실패했을 때만 '인터넷 없이 저장된 자료' 안내
@@ -196,6 +197,7 @@ function flush(keepalive) {
   }).then(function () {
     inflight = false; banner(); if (S.view === 'loc' || S.view === 'choose') render();
     if (outbox().length && !flushT && failStreak === 0) flushT = setTimeout(flush, 300);
+    sendIfWanted();   // [보내기]를 눌렀는데 휴대폰에만 있던 기록이 있었으면 → 다 올라간 뒤 이어서 보냄
   });
 }
 function saveCache() { if (S.data) lsSet(K.cache, JSON.stringify(S.data)); }
@@ -308,7 +310,8 @@ function recLine(r) {
     ? shortOf(r.loc) + ' → Picking ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '') + (r.empty ? ' ★재고X' : '')
     : r.kind === 'back' ? 'Picking → ' + shortOf(r.loc) + ' 되돌림 ' + (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + r.units + '개' : '')
     : shortOf(r.from) + ' → ' + shortOf(r.to) + ' 파레트';
-  var tag = r.status === '보내는 중' ? '<span class="tag wait">보내는 중</span>' : r.status === '가져감' ? '<span class="tag">사무실 가져감</span>'
+  var tag = r.status === '보내는 중' ? '<span class="tag wait">휴대폰에 저장</span>' : r.status === '새로' ? '<span class="tag wait">아직 안 보냄</span>'
+    : r.status === '보냄' ? '<span class="tag">사무실로 보냄</span>' : r.status === '가져감' ? '<span class="tag">사무실 가져감</span>'
     : r.status === '안 들어감' ? '<span class="tag bad">안 들어감</span>' : '';
   var can = (r.status === '새로' || r.status === '보내는 중') && r.worker === S.worker;
   return '<div class="rec' + (r.status === '취소' || r.status === '안 들어감' ? ' cx' : '') + '"><div>' + esc(t) + ' ' + esc(r.name || r.code) + tag + '<br><span class="sub">' +
@@ -330,8 +333,50 @@ function viewLoc(p) {
     h += '</div>';
   }
   h += '<button class="small" onclick="S.view=\'choose\';S.msg=null;render()">다른 자리 고르기 · 오늘 내 기록</button>';
+  h += myCard();
   return h;
 }
+
+// ---- 2026-11-13 김문수 님 "오전 재고보충 때 많이 옮기니 아래 칸에 이동 내역 목록을 만들어 놓고, 이동이 끝나면 [전송하기], 취소도"
+//      기록은 지금처럼 바로 구글에 저장('아직 안 보냄') → [📤 이동 끝 — 사무실로 보내기]를 누르면 '보냄' → 업무허브가 30초 안에 가져가
+//      업로드 파일을 만들고 메일. 보내기 전에는 줄마다 [취소], 보낸 뒤에는 사무실에 말하기
+function unsent() { return S.data ? S.data.log.filter(function (r) { return r.worker === S.worker && (r.status === '새로' || r.status === '보내는 중'); }) : []; }
+function myCard() {
+  var mine = S.data.log.filter(function (r) { return r.worker === S.worker; });
+  var un = unsent();
+  var sent = mine.filter(function (r) { return r.status === '보냄'; }).length, taken = mine.filter(function (r) { return r.status === '가져감'; }).length;
+  if (!un.length && !sent && !taken) return '';
+  var h = '<div class="card" style="margin-top:16px;border:2px solid ' + (un.length ? 'var(--amber)' : 'var(--line)') + '"><h3>📋 오늘 내 이동 — 아직 안 보낸 ' + un.length + '건</h3>';
+  if (!un.length) h += '<div class="muted">안 보낸 기록이 없어요</div>';
+  un.forEach(function (r) { h += recLine(r); });
+  h += '<div class="sub" style="margin-top:6px">사무실로 보냄 ' + sent + '건 · 사무실 가져감 ' + taken + '건</div></div>';
+  if (un.length) h += '<button class="big" onclick="sendAll()">📤 이동 끝 — 사무실로 보내기 (' + un.length + '건)</button>' +
+    '<div class="muted" style="margin:-4px 2px 10px">보내면 1~2분 안에 사무실에 업로드 파일과 메일이 만들어져요. 보낸 뒤에는 휴대폰에서 취소할 수 없어요.</div>';
+  return h;
+}
+function sendAll(auto) {
+  var un = unsent();
+  if (!un.length) { lsSet('mm_send_wanted', null); return; }
+  if (!auto && !confirm(un.length + '건을 사무실로 보낼까요?\n보낸 뒤에는 휴대폰에서 취소할 수 없어요 (사무실에 말하기).')) return;
+  if (outbox().length) {   // 휴대폰에만 있는 기록이 있으면 먼저 구글로 → 끝나면 저절로 이어서 보냄
+    lsSet('mm_send_wanted', '1');
+    S.msg = { t: 'warn', s: '기록을 먼저 구글로 보내는 중이에요 — 끝나면 저절로 사무실로 보내요' }; render(); flush(); return;
+  }
+  api('phoneSend', { ids: un.map(function (r) { return r.id; }), worker: S.worker }).then(function (j) {
+    lsSet('mm_send_wanted', null);
+    var ok = {}; j.sent.forEach(function (id) { ok[id] = 1; });
+    S.data.log.forEach(function (r) { if (ok[r.id]) r.status = '보냄'; });
+    saveCache();
+    S.msg = { t: 'ok', s: '✓ ' + j.sent.length + '건을 사무실로 보냈어요 — 1~2분 안에 업로드 파일과 메일이 만들어져요' +
+      (j.skipped.length ? ' (못 보낸 ' + j.skipped.length + '건: ' + j.skipped[0].why + ')' : '') };
+    render();
+  }).catch(function (e) {
+    if (e.code === 'pin') return pinFail();
+    lsSet('mm_send_wanted', '1');
+    S.msg = { t: 'warn', s: '인터넷이 안 돼서 아직 못 보냈어요 — 연결되면 저절로 보내요 (' + e.message + ')' }; render();
+  });
+}
+function sendIfWanted() { if (lsGet('mm_send_wanted') && S.data && !outbox().length && !inflight) sendAll(true); }
 
 function productPicker(codes, sel) {
   var list = codes.length ? codes.map(itemOf) : (S.data.items || []).slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
@@ -565,6 +610,7 @@ function viewChoose() {
   if (!mine.length) h += '<div class="muted">아직 없어요</div>';
   mine.slice().reverse().forEach(function (r) { h += recLine(r); });
   h += '</div>';
+  if (unsent().length) h += '<button class="big" onclick="sendAll()">📤 이동 끝 — 사무실로 보내기 (' + unsent().length + '건)</button>';
   if (parseLoc(S.loc)) h += '<button class="big alt" onclick="back()">' + esc(parseLoc(S.loc).short) + '(으)로 돌아가기</button>';
   return h;
 }

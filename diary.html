@@ -3,58 +3,91 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="theme-color" content="#13795b">
+<meta name="theme-color" content="#ffffff">
 <title>메디포스트 업무일지</title>
 <style>
-  :root { --bg:#f3f5f4; --card:#fff; --ink:#17201b; --mute:#5d6a63; --line:#d9e0dc; --go:#13795b; --go-soft:#e3f3ec;
-          --amber:#8a5300; --amber-soft:#fff3dc; --red:#b42318; --red-soft:#fde8e6; --blue:#1d4ed8; }
+  /* 2026-11-13 김문수 님 "휴대폰 업무일지 화면도 (재고이동처럼) 업무허브와 같은 디자인으로" → 재고이동 2026-11-13b와 같은 색·로고·버튼.
+     눈에 띄어야 할 것: 날짜(맨 위 큰 칸), 합계수량·박스 합계(큰 숫자 두 칸). 작은 글자도 흰 바탕 대비 4.5:1 이상 */
+  :root { --bg:#eef2f1; --card:#fff; --ink:#1f2d2a; --ink2:#4d5d59; --mute:#5f6f6b; --line:#dce4e1; --edge:#e1e8e5;
+          --go:#12804f; --go-ink:#0f6e47; --go-soft:#e2f3ea; --go-line:#bfe3cf;
+          --amber:#94600c; --amber-ink:#7a4f0a; --amber-soft:#fff3d6; --amber-line:#f0d8a0;
+          --red:#c93c3c; --red-ink:#9b2c2c; --red-soft:#fdeaea; --red-line:#f3c4c4;
+          --blue-ink:#1f4f9e; --gray-soft:#eef1f0;
+          --sh:0 1px 2px rgba(20,40,35,.05),0 4px 14px rgba(20,40,35,.06); }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.45 -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
-  .wrap { max-width:560px; margin:0 auto; padding:10px 12px 90px; }
-  #banner { position:sticky; top:0; z-index:5; background:var(--amber-soft); color:var(--amber); font-weight:700; font-size:15px; padding:10px 14px; border-bottom:1px solid #ecd29a; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.5 "Malgun Gothic","Apple SD Gothic Neo",system-ui,-apple-system,"Noto Sans KR",sans-serif;
+         word-break:keep-all; overflow-wrap:break-word; }   /* 한글은 띄어쓰기에서 줄바꿈 */
+  button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .wrap { max-width:560px; margin:0 auto; padding:0 14px 96px; }
+  #banner { position:sticky; top:0; z-index:5; background:var(--amber-soft); color:var(--amber-ink); font-weight:800; font-size:15px; padding:10px 14px; border-bottom:1px solid var(--amber-line); }
   #banner.hide { display:none; }
-  .top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:4px 2px 6px; }
-  .ttl { font-size:22px; font-weight:800; }
-  .who { font-size:14px; color:var(--mute); text-align:right; }
-  .who a, a.lnk { color:var(--blue); }
-  .day { display:flex; align-items:center; justify-content:center; gap:10px; margin:6px 0 2px; }
-  .day b { font-size:22px; }
-  .day button { width:46px; height:42px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:20px; color:var(--ink); }
+  /* 위쪽 막대 — 업무허브·재고이동과 같은 로고 */
+  .topbar { display:flex; align-items:center; gap:10px; margin:0 -14px 12px; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); }
+  .topbar svg { width:32px; height:32px; flex:none; }
+  .topbar .bt { flex:1; min-width:0; line-height:1.25; }
+  .topbar .bt b { display:block; font-size:16px; letter-spacing:-.3px; }
+  .topbar .bt small { display:block; font-size:12px; color:var(--mute); }
+  .who { font-size:14px; color:var(--ink2); text-align:right; line-height:1.5; }
+  .who b { color:var(--ink); }
+  .who a, a.lnk { color:var(--blue-ink); font-weight:700; text-decoration:none; }
+  /* 날짜 칸 (재고이동의 '지금 자리'와 같은 모양) */
+  .dayc { background:var(--card); border:1px solid var(--edge); border-left:6px solid var(--go); border-radius:16px; box-shadow:var(--sh); padding:10px 12px 10px 14px; margin:0 0 12px; }
+  .dayc .hk { font-size:13px; font-weight:800; color:var(--mute); }
+  .day { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:2px 0 4px; }
+  .day button { width:48px; height:48px; flex:none; border-radius:12px; border:1.5px solid #d3ddd9; background:#fff; font-size:20px; color:var(--ink); }
   .day button:disabled { opacity:.35; }
-  .pick { position:relative; display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+  .pick { position:relative; flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:6px; padding:4px 8px; border-radius:12px; }
+  .pick b { font-size:26px; font-weight:900; letter-spacing:-.3px; white-space:nowrap; }
   .pick input { position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; border:0; padding:0; }
-  .past { background:var(--amber-soft); color:var(--amber); border-radius:10px; padding:8px 12px; margin:6px 0; font-size:15px; font-weight:700; text-align:center; }
-  .undo { margin-left:8px; height:36px; padding:0 14px; border-radius:10px; border:1px solid currentColor; background:#fff; color:inherit; font-weight:800; font-size:15px; }
-  .meta { text-align:center; color:var(--mute); font-size:14px; margin-bottom:4px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin:10px 0; }
-  .card h3 { margin:0 0 8px; font-size:16px; color:var(--mute); font-weight:800; display:flex; justify-content:space-between; align-items:center; }
-  .ord { border:1px solid var(--line); border-radius:12px; padding:10px; margin:8px 0; background:#fbfcfb; }
-  .ord .r1 { display:grid; grid-template-columns: 1.2fr 1fr 0.8fr 36px; gap:6px; align-items:end; }
+  .meta { text-align:center; color:var(--mute); font-size:13.5px; }
+  .past { background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:12px; padding:8px 12px; margin:0 0 12px; font-size:15px; font-weight:700; text-align:center; }
+  .undo { margin-left:8px; height:38px; padding:0 14px; border-radius:10px; border:1px solid currentColor; background:#fff; color:inherit; font-weight:800; font-size:15px; }
+  /* 카드 */
+  .card { background:var(--card); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--sh); padding:14px 16px; margin:12px 0; }
+  .card h3 { margin:0 0 10px; font-size:16px; color:var(--ink2); font-weight:800; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .card h3 .muted { font-weight:600; font-size:13px; }
+  .card p { margin:14px 0 6px; font-size:16px; font-weight:700; color:var(--ink2); }
+  .ord { border:1.5px solid var(--line); border-radius:14px; padding:10px; margin:8px 0; background:#f7faf9; }
+  .ord .r1 { display:grid; grid-template-columns: 1.2fr 1fr 0.8fr 40px; gap:6px; align-items:end; }
   .ord .r2 { display:grid; grid-template-columns: minmax(0,1fr) auto 10px minmax(0,1fr) auto; gap:5px; align-items:center; margin-top:8px; }
   .ord .r1 > *, .ord .r2 > * { min-width:0; }   /* 좁은 휴대폰에서 [끝] 버튼이 밖으로 밀리지 않게 */
+  .ord .r2 > span { text-align:center; font-weight:800; color:var(--ink2); }
   .tw:empty { display:none; }
-  .tw { margin-top:6px; background:var(--amber-soft); color:var(--amber); border-radius:8px; padding:6px 8px; font-size:14px; font-weight:700; }
-  .lab { font-size:12px; color:var(--mute); font-weight:700; display:block; margin-bottom:2px; }
-  input, select, textarea { width:100%; height:46px; font-size:18px; padding:4px 8px; border:2px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
-  input[type=number] { text-align:center; font-weight:700; }
-  input[type=time] { font-size:15px; padding:2px 2px; min-width:0; text-align:center; }
+  .tw { margin-top:8px; background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:10px; padding:6px 10px; font-size:14px; font-weight:700; }
+  .lab { font-size:12.5px; color:var(--mute); font-weight:800; display:block; margin-bottom:3px; }
+  input, select, textarea { width:100%; height:48px; font-size:18px; padding:4px 8px; border:1.5px solid #cfd9d5; border-radius:12px; background:#fff; color:var(--ink); font-family:inherit; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--go); box-shadow:0 0 0 3px var(--go-soft); }
+  select { font-weight:700; }
+  input[type=number] { text-align:center; font-weight:800; font-size:20px; font-variant-numeric:tabular-nums; }
+  input[type=time] { font-size:15px; padding:2px 2px; min-width:0; text-align:center; font-weight:700; }
   input[type=time]::-webkit-calendar-picker-indicator { display:none; }   /* 시계 그림이 자리를 차지해 시각이 잘림 → 숨김(누르면 휴대폰 시간 고르기가 뜸) */
-  textarea { height:84px; font-size:16px; }
-  .now { height:46px; padding:0 8px; white-space:nowrap; border-radius:10px; border:1px solid var(--go); background:var(--go-soft); color:var(--go); font-weight:800; font-size:14px; }
-  .del { height:46px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--red); font-size:20px; }
-  .add { width:100%; height:50px; border-radius:12px; border:2px dashed var(--go); background:#fff; color:var(--go); font-weight:800; font-size:17px; margin-top:4px; }
+  textarea { height:88px; font-size:16px; padding:8px 10px; }
+  .now { height:48px; padding:0 9px; white-space:nowrap; border-radius:12px; border:1px solid var(--go-line); background:var(--go-soft); color:var(--go-ink); font-weight:800; font-size:14px; }
+  .del { height:48px; border-radius:12px; border:1.5px solid var(--red-line); background:#fff; color:var(--red-ink); font-size:22px; font-weight:800; }
+  .add { width:100%; height:52px; border-radius:14px; border:2px dashed var(--go-line); background:#fff; color:var(--go-ink); font-weight:800; font-size:17px; margin-top:4px; }
   .g4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
   .g3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
-  .sum { background:var(--go-soft); color:var(--go); border-radius:12px; padding:10px 12px; font-weight:800; margin:10px 0; font-size:16px; }
-  .warn { background:var(--amber-soft); color:var(--amber); border-radius:12px; padding:10px 12px; margin:10px 0; font-size:15px; font-weight:700; }
-  .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 12px; margin:10px 0; font-weight:700; }
-  .ok { background:var(--go-soft); color:var(--go); border-radius:12px; padding:10px 12px; margin:10px 0; font-weight:800; }
+  /* 합계 — 큰 숫자 두 칸 */
+  .sum { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:16px; padding:10px 14px; margin:12px 0; }
+  .sum .kp { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .sum .kp > div { background:#fff; border-radius:12px; padding:6px 10px; text-align:center; }
+  .sum small { display:block; font-size:13px; font-weight:800; color:var(--ink2); }
+  .sum b { font-size:30px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2; }
+  .sum .u { font-size:15px; font-weight:700; color:var(--ink2); margin-left:2px; }
+  .sum .kd { text-align:center; font-size:14px; font-weight:700; margin-top:6px; }
+  .warn { background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; font-weight:700; }
+  .err { background:var(--red-soft); color:var(--red-ink); border:1px solid var(--red-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:700; }
+  .ok { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:800; }
   .muted { color:var(--mute); font-size:14px; }
-  .bar { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--line); padding:8px 12px; }
+  /* 아래 [저장] 막대 */
+  .bar { position:fixed; left:0; right:0; bottom:0; z-index:4; background:#fff; border-top:1px solid var(--line); box-shadow:0 -2px 10px rgba(20,40,35,.06); padding:8px 14px calc(8px + env(safe-area-inset-bottom)); }
   .bar .in { max-width:560px; margin:0 auto; display:flex; gap:10px; align-items:center; }
-  .bar .st { flex:1; font-size:14px; color:var(--mute); font-weight:700; }
-  .bar button { height:50px; padding:0 22px; border-radius:12px; border:0; background:var(--go); color:#fff; font-size:18px; font-weight:800; }
-  .big { display:block; width:100%; min-height:56px; margin:10px 0; border-radius:14px; border:0; background:var(--go); color:#fff; font-size:19px; font-weight:800; }
+  .bar .st { flex:1; font-size:14px; color:var(--ink2); font-weight:700; }
+  .bar button { height:52px; padding:0 26px; border-radius:14px; border:0; background:linear-gradient(90deg,#16915b,#12804f); color:#fff; font-size:18px; font-weight:800; box-shadow:0 4px 12px rgba(18,128,79,.22); }
+  .big { display:block; width:100%; min-height:58px; margin:10px 0; border-radius:14px; border:0; background:linear-gradient(90deg,#16915b,#12804f); color:#fff; font-size:19px; font-weight:800; box-shadow:0 4px 12px rgba(18,128,79,.22); }
+  .bar button:active, .big:active { transform:translateY(1px); filter:brightness(.97); }
+  @media (max-width:360px) { .pick b { font-size:22px; } .sum b { font-size:26px; } }
 </style>
 </head>
 <body>
@@ -68,7 +101,7 @@
  * 종이 업무일지 칸을 휴대폰으로 같이 채움 → 구글 시트 [업무일지] (config.js apiUrl, 휴대폰 재고이동과 같은 웹앱·PIN)
  * 고치면 2.5초 뒤(또는 [저장]) '바꾼 칸만' 보내고 구글이 지금 내용에 합침 → 여러 명이 동시에 써도 서로 안 덮어씀.
  * 인터넷이 끊기면 휴대폰에 남았다가 연결되면 보냄. 사무실 업무허브가 데일리 리포트 카드로 가져감. */
-var VERSION = '2026-11-12a';
+var VERSION = '2026-11-13a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var KINDS = ['건기식', '제대혈', '제대조직'];
 var BOXES = ['1호', '2호', '3호', '4호', '6호', '7호', '8호', '기타'];
@@ -250,22 +283,29 @@ function status() {
     else { b.className = 'hide'; b.textContent = ''; }
   }
 }
+// 2026-11-13 업무허브·재고이동과 같은 로고
+var LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cf2b0"/><stop offset="1" stop-color="#16a66a"/></linearGradient></defs><path d="M24 4L44 42H33L24 24L15 42H4Z" fill="url(#lg1)"/><path d="M17 33h14" stroke="#ffffff" stroke-width="4"/></svg>';
 function render() {
-  var h = '<div class="top"><div class="ttl">📝 업무일지</div><div class="who">' + (W.worker ? esc(W.worker) + ' · <a href="#" onclick="D.view=\'who\';render();return false">바꾸기</a><br>' : '') +
-    '<a class="lnk" href="./">재고이동 →</a></div></div>';
-  if (D.msg) h += '<div class="' + D.msg.t + '">' + esc(D.msg.s) + (D.msg.undo && D.undo && D.undo.date === D.date ? '<button class="undo" onclick="undo()">↩ 되돌리기</button>' : '') + '</div>';
-  if (D.view === 'who') { $('app').innerHTML = h + viewWho(); $('bar').style.display = 'none'; status(); return; }
+  var h = '<div class="topbar">' + LOGO + '<div class="bt"><b>메디포스트</b><small>업무일지 · 오현물류</small></div><div class="who">' +
+    (W.worker ? '<b>' + esc(W.worker) + '</b> · <a href="#" onclick="D.view=\'who\';render();return false">바꾸기</a><br>' : '') +
+    '<a class="lnk" href="./">📦 재고이동</a></div></div>';
+  if (D.view === 'who') {
+    if (D.msg) h += '<div class="' + D.msg.t + '">' + esc(D.msg.s) + '</div>';
+    $('app').innerHTML = h + viewWho(); $('bar').style.display = 'none'; status(); return;
+  }
   var today = ymd(new Date());
   // 날짜: ◀▶ 하루씩, 가운데 날짜를 누르면 달력에서 고르기 (2026-11-09 "언제든 수정하고 관리")
-  h += '<div class="day"><button onclick="shift(-1)">◀</button><label class="pick"><b>' + mdLabel(D.date) + '</b><span>📅</span>' +
+  h += '<div class="dayc"><div class="hk">' + (D.date === today ? '오늘 일지' : '지난 날짜 일지') + '</div>' +
+    '<div class="day"><button onclick="shift(-1)" aria-label="하루 앞">◀</button><label class="pick"><b>' + mdLabel(D.date) + '</b><span>📅</span>' +
     '<input type="date" value="' + D.date + '" max="' + today + '" onclick="try{this.showPicker()}catch(e){}" onchange="pickDay(this.value)"></label>' +
-    '<button onclick="shift(1)"' + (D.date >= today ? ' disabled' : '') + '>▶</button></div>';
+    '<button onclick="shift(1)"' + (D.date >= today ? ' disabled' : '') + ' aria-label="하루 뒤">▶</button></div>';
+  h += '<div class="meta">' + (D.at ? '마지막으로 고친 사람: ' + esc(D.by) + ' · ' + esc(String(D.at).slice(5, 16)) : '아직 아무도 안 썼어요') + ' · 날짜를 누르면 달력</div></div>';
   if (D.date !== today) h += '<div class="past">지난 날짜 일지예요 · 고치거나 지우면 그대로 저장되고 사무실 허브에도 들어가요 · <a class="lnk" href="#" onclick="openDay(ymd(new Date()));return false">오늘로</a></div>';
-  h += '<div class="meta">' + (D.at ? '마지막으로 고친 사람: ' + esc(D.by) + ' · ' + esc(String(D.at).slice(5, 16)) : '아직 아무도 안 썼어요') + ' · 날짜를 누르면 달력</div>';
+  if (D.msg) h += '<div class="' + D.msg.t + '">' + esc(D.msg.s) + (D.msg.undo && D.undo && D.undo.date === D.date ? '<button class="undo" onclick="undo()">↩ 되돌리기</button>' : '') + '</div>';
   if (!D.cur) { $('app').innerHTML = h + '<p class="muted">불러오는 중…</p>'; $('bar').style.display = 'none'; status(); return; }
   var c = D.cur;
   // 오더
-  h += '<div class="card"><h3>오더 · 건수 · 작업시간 <span class="muted">차수마다 한 줄</span></h3>';
+  h += '<div class="card"><h3>🧾 오더 · 건수 · 작업시간 <span class="muted">차수마다 한 줄</span></h3>';
   if (!c.orders.length) h += '<div class="muted">차수가 끝나면 [+ 오더 줄]을 눌러 넣어 주세요.</div>';
   c.orders.forEach(function (o, i) {
     h += '<div class="ord"><div class="r1">' +
@@ -281,21 +321,21 @@ function render() {
   h += '<div style="margin-top:10px"><label><span class="lab">추송 건수</span><input type="number" inputmode="numeric" value="' + (c.add == null ? '' : c.add) + '" oninput="setF(\'add\',num(this.value))"></label></div>';
   h += '</div>';
   // 박스
-  h += '<div class="card"><h3>출고 박스 수량</h3><div class="g4">';
+  h += '<div class="card"><h3>📦 출고 박스 수량</h3><div class="g4">';
   BOXES.forEach(function (k) { h += '<label><span class="lab">' + k + '</span><input type="number" inputmode="numeric" value="' + (c.boxes[k] == null ? '' : c.boxes[k]) + '" oninput="setG(\'boxes\',\'' + k + '\',num(this.value))"></label>'; });
   h += '</div></div>';
   h += '<div id="chk"></div>';
   // 부자재
-  h += '<div class="card"><h3>부자재 사용수량</h3><div class="g3">';
+  h += '<div class="card"><h3>🧻 부자재 사용수량</h3><div class="g3">';
   MRO.forEach(function (k) { h += '<label><span class="lab">' + k + '</span><input type="number" inputmode="numeric" value="' + (c.mro[k] == null ? '' : c.mro[k]) + '" oninput="setG(\'mro\',\'' + k + '\',num(this.value))"></label>'; });
   h += '</div></div>';
   // 특이사항·근무
-  h += '<div class="card"><h3>특이사항</h3><textarea oninput="setF(\'memo\',this.value)" placeholder="없으면 비워 두기">' + esc(c.memo) + '</textarea></div>';
-  h += '<div class="card"><h3>근무현황</h3><div class="g3">';
+  h += '<div class="card"><h3>📝 특이사항</h3><textarea oninput="setF(\'memo\',this.value)" placeholder="없으면 비워 두기">' + esc(c.memo) + '</textarea></div>';
+  h += '<div class="card"><h3>👥 근무현황</h3><div class="g3">';
   WORKERS.forEach(function (k) { h += '<label><span class="lab">' + k + '</span><input type="text" value="' + esc(c.workers[k]) + '" oninput="setG(\'workers\',\'' + k + '\',this.value)"></label>'; });
   h += '</div></div>';
   // 11/9 김문수 님 "모두 지우기는 위험해 보인다, 수정할 수 있으니 없애줘" → 하루 전체 지우기 버튼은 없음. 칸·줄 단위로만 고치고 지움
-  h += '<div class="card"><h3>고치기 · 지우기</h3><div class="muted">칸을 고치면 2.5초 뒤 저절로 저장돼요(지난 날짜도). 잘못 쓴 숫자는 지우면 빈 칸, 오더 줄은 ×로 지워요. 줄을 지운 바로 뒤에는 [↩ 되돌리기]로 살릴 수 있어요.</div></div>';
+  h += '<div class="card"><h3>ℹ 고치기 · 지우기</h3><div class="muted">칸을 고치면 2.5초 뒤 저절로 저장돼요(지난 날짜도). 잘못 쓴 숫자는 지우면 빈 칸, 오더 줄은 ×로 지워요. 줄을 지운 바로 뒤에는 [↩ 되돌리기]로 살릴 수 있어요.</div></div>';
   h += '<div class="foot muted" style="text-align:center;margin-top:16px">메디포스트 업무일지 · ' + VERSION + ' · 쓰면 저절로 보내져요</div>';
   $('app').innerHTML = h; $('bar').style.display = '';
   chk(); status();
@@ -304,7 +344,9 @@ function chk() {
   var el = $('chk'); if (!el || !D.cur) return;
   var t = totals(D.cur), c = D.cur, parts = KINDS.filter(function (k) { return t.by[k]; }).map(function (k) { return k + ' ' + t.by[k]; });
   if (c.add) parts.push('추송 ' + c.add);
-  var h = '<div class="sum">합계수량 ' + t.total + '건' + (parts.length ? ' (' + parts.join(' · ') + ')' : '') + ' · 박스 합계 ' + t.bsum + '</div>';
+  var h = '<div class="sum"><div class="kp"><div><small>합계수량</small><b>' + t.total + '</b><span class="u">건</span></div>' +
+    '<div><small>박스 합계</small><b>' + t.bsum + '</b><span class="u">박스</span></div></div>' +
+    (parts.length ? '<div class="kd">' + esc(parts.join(' · ')) + '</div>' : '') + '</div>';
   if (t.bsum && t.total && t.bsum !== t.total) h += '<div class="warn">박스 합계 ' + t.bsum + ' ≠ 합계수량 ' + t.total + ' — 다시 세어 보기</div>';
   var bad = 0;
   c.orders.forEach(function (o, i) {

@@ -136,6 +136,28 @@
   #banner { position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--amber-soft); color:var(--amber-ink); font-weight:800; font-size:15px;
             padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--amber-line); box-shadow:0 -2px 8px rgba(0,0,0,.06); }
   #banner.hide { display:none; }
+  /* 2026-11-23 김문수 님 "더 보기 쉽고 간편하게, 누구나 쉽게" — 숫자 버튼·저장 확인·첫 화면 단순·보낼 이동 줄 */
+  #banner.send { background:#fff; color:var(--ink); border-top:2px solid var(--amber); display:flex; align-items:center; gap:10px; }
+  #banner.send .bt2 { flex:1; min-width:0; font-size:16px; font-weight:900; line-height:1.3; }
+  #banner.send .bt2 small { display:block; font-size:12.5px; font-weight:700; color:var(--mute); }
+  #banner.send button { flex:none; height:52px; padding:0 20px; border-radius:12px; border:0; background:var(--go); color:#fff; font-size:18px; font-weight:900; }
+  .nums { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin:6px 0 4px; }
+  .nums button { height:72px; border-radius:16px; border:2px solid #d3ddd9; background:#fff; font-size:34px; font-weight:900; color:var(--ink); }
+  .nums button.sel { border:3px solid var(--go); background:var(--go-soft); color:var(--go-ink); }
+  .nums button.more { font-size:17px; font-weight:800; color:var(--ink2); }
+  .big.huge { min-height:84px; font-size:23px; }
+  .big.huge .ic { font-size:30px; width:36px; }
+  .big.off { background:#c9d3cf; }
+  .others { margin:14px 0 6px; }
+  .others .oh { font-size:14px; font-weight:800; color:var(--mute); margin:0 2px 2px; }
+  .others .big { min-height:52px; font-size:16.5px; margin:8px 0; }
+  .others .big .ic { font-size:20px; }
+  .done { text-align:center; padding:22px 16px 18px; border:3px solid var(--go); }
+  .done .dk { font-size:64px; line-height:1; color:var(--go); font-weight:900; }
+  .done .dt { font-size:24px; font-weight:900; margin:8px 0 4px; }
+  .done .dr { font-size:21px; font-weight:800; margin:6px 0; }
+  .done .dn { font-size:17px; color:var(--ink2); font-weight:700; }
+  .done .next { margin-top:14px; padding:12px; border-radius:12px; background:var(--go-soft); color:var(--go-ink); font-size:18px; font-weight:900; }
   @media (max-width:360px) { .hero .hloc { font-size:42px; } .route .rb b { font-size:28px; } .pn { font-size:19px; } .big { font-size:18px; } }
 </style>
 </head>
@@ -149,7 +171,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-13b';
+var VERSION = '2026-11-23a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -285,6 +307,14 @@ function banner() {
   var c = outbox().length, b = $('banner');
   if (!b) return;
   if (!CFG.apiUrl) { b.textContent = '설정 전: config.js에 구글 웹앱 주소가 없어요'; b.className = ''; return; }
+  // 11/23 아직 안 보낸 이동이 있으면 자리 화면·자리 고르기 화면 맨 아래에 늘 '보낼 이동 N건 [보내기]' (맨 아래까지 안 내려도 보이게)
+  var un = (S.data && S.worker && (S.view === 'loc' || S.view === 'choose')) ? unsent().length : 0;
+  if (un) {
+    b.className = 'send';
+    b.innerHTML = '<div class="bt2">📤 보낼 이동 ' + un + '건<small>' + (c ? '휴대폰에 저장된 ' + c + '건 포함 · 인터넷 되면 같이 보내요' : '이동이 끝나면 사무실로 보내 주세요') + '</small></div>' +
+      '<button onclick="sendAll()">보내기</button>';
+    return;
+  }
   if (c) { b.textContent = '📶 아직 못 보낸 기록 ' + c + '건 — 휴대폰에 저장돼 있어요. 연결되면 자동으로 보내요'; b.className = ''; }
   else if (S.data && !S.fresh && S.loadFailed) { b.textContent = '인터넷 없이 저장된 자료로 보고 있어요 (' + esc((S.data.at || '').slice(5, 16)) + ' 받음)'; b.className = ''; }
   else { b.textContent = ''; b.className = 'hide'; }
@@ -359,8 +389,8 @@ function render() {
   var h = '', p = parseLoc(S.loc);
   h += '<div class="bar">' + LOGO + '<div class="bt"><b>메디포스트</b><small>재고이동 · 오현물류</small></div>';
   h += '<div class="who">' + (S.worker ? '<b>' + esc(S.worker) + '</b> · <a href="#" onclick="S.view=\'who\';S.msg=null;render();return false">바꾸기</a><br>' : '') + '<a href="diary.html">📝 업무일지</a></div></div>';
-  if (S.view !== 'who') h += hero(p);
-  if (S.msg) h += '<div class="' + S.msg.t + '">' + esc(S.msg.s) + '</div>';
+  if (S.view !== 'who' && S.view !== 'done') h += hero(p);
+  if (S.msg && S.view !== 'done') h += '<div class="' + S.msg.t + '">' + esc(S.msg.s) + '</div>';
   var pd = S.view !== 'who' ? pendGet() : null;
   if (pd && S.view !== 'waitdest' && S.view !== 'confirmMove') {   // 옮기는 중인데 다른 화면에 있을 때
     h += '<div class="warn"><b>➡ 파레트 옮기는 중</b> · ' + pendLeft(pd) + '분 남음<div style="margin:6px 0 2px;font-size:16px">' + lc(pd.from) + ' → ? · <b>' + esc(pd.name || pd.code) + '</b></div>' +
@@ -376,6 +406,7 @@ function render() {
   else if (S.view === 'waitdest') h += viewWaitDest();
   else if (S.view === 'confirmMove' && pendGet() && p) h += viewConfirmMove(p);
   else if (S.view === 'back') h += viewBack(p);
+  else if (S.view === 'done' && S.done) h += viewDone();
   else if (S.view === 'choose' || !p) h += viewChoose();
   else h += viewLoc(p);
   h += '<div class="foot">메디포스트 재고이동 · ' + VERSION + '</div>';
@@ -431,10 +462,12 @@ function recLine(r) {
 function viewLoc(p) {
   var rows = stockAt(p.full);
   var h = stockCard(p);
-  h += bigBtn('', 'startPick()', '📦', 'Picking으로 꺼냈어요');
-  h += bigBtn('alt', 'startRefill()', '⬇', '2·3단 파레트를 여기로 내렸어요');
-  if (rows.length) h += bigBtn('alt', 'startMoveTo()', '➡', '이 자리 파레트를 다른 자리로 옮겼어요', '넣은 자리 QR 찍기');
-  h += bigBtn('alt', 'startBack()', '↩', 'Picking에서 여기로 되돌려 넣었어요', '피킹존 자리 없을 때');
+  // 11/23 첫 화면 단순하게: 가장 많이 쓰는 [Picking으로 꺼냈어요]만 아주 크게, 나머지는 아래 '다른 작업'에 작게
+  h += bigBtn('huge', 'startPick()', '📦', 'Picking으로 꺼냈어요');
+  h += '<div class="others"><div class="oh">다른 작업</div>' +
+    bigBtn('alt', 'startRefill()', '⬇', '2·3단 파레트를 여기로 내렸어요') +
+    (rows.length ? bigBtn('alt', 'startMoveTo()', '➡', '이 자리 파레트를 다른 자리로', '넣은 자리 QR 찍기') : '') +
+    bigBtn('alt', 'startBack()', '↩', 'Picking에서 여기로 되돌려 넣었어요', '피킹존 자리 없을 때') + '</div>';
   var recs = todayAt(p.full);
   if (recs.length) {
     h += '<div class="card"><h3>🕘 오늘 이 자리 기록</h3>';
@@ -507,24 +540,42 @@ function productPicker(codes, sel, lotFull) {
 // ---- Picking으로 꺼냄
 function startPick() {
   var codes = uniq(stockAt(parseLoc(S.loc).full).map(function (r) { return r.code; }));
-  S.form = { kind: 'pick', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: 1, units: '', unitsOn: false, empty: false };
+  S.form = { kind: 'pick', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: '', units: '', unitsOn: false, empty: false };
   S.view = 'pick'; S.msg = null; render();
+}
+// 11/23 박스 수: −/+ 대신 큰 숫자 버튼 [1]~[6] 한 번 누르기, 7박스 넘으면 [직접 넣기] (장갑 끼고도 누르기 쉽게)
+function boxPad(f) {
+  if (f.typeBoxes) {
+    return '<div class="step"><button onclick="bump(-1)">−</button>' +
+      '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
+      '<button onclick="bump(1)">+</button><span>박스</span></div>' +
+      '<button class="small" onclick="S.form.typeBoxes=false;S.form.boxes=\'\';render()">숫자 버튼으로 돌아가기</button>';
+  }
+  var h = '<div class="nums">';
+  [1, 2, 3, 4, 5, 6].forEach(function (k) {
+    h += '<button class="' + (String(f.boxes) === String(k) ? 'sel' : '') + '" onclick="pickBoxes(' + k + ')">' + k + '</button>';
+  });
+  return h + '</div><div class="nums" style="grid-template-columns:1fr"><button class="more" onclick="S.form.typeBoxes=true;S.form.boxes=7;render()">7박스 이상 · 직접 넣기</button></div>';
+}
+function pickBoxes(k) { S.form.boxes = k; S.form.units = ''; render(); }
+function saveLabel(f) {
+  var b = parseInt(f.boxes || '0', 10) || 0, u = parseInt(f.units || '0', 10) || 0;
+  return u > 0 ? '저장 — 낱개 ' + n(u) + '개' : b > 0 ? '저장 — ' + b + '박스' : f.empty ? '저장 — 재고X (다 꺼냄)' : '박스 수를 먼저 눌러 주세요';
 }
 function viewPick(p) {
   var f = S.form, it = f.code ? itemOf(f.code) : null;
   S._avail = f.code ? stockAt(p.full).filter(function (r) { return r.code === f.code; }).reduce(function (a, r) { return a + r.avail; }, 0) : 0;
   S._per = it ? it.per : 0;
   var h = '<div class="card"><h3>📦 ' + lc(p.full) + ' → Picking으로 꺼냈어요</h3>' + productPicker(f.codes, f.code, p.full);
-  h += '<p>꺼낸 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
-    '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
-    '<button onclick="bump(1)">+</button><span>박스</span></div>';
+  h += '<p>꺼낸 박스 수를 눌러 주세요</p>' + boxPad(f);
   h += '<label class="chk' + (f.empty ? ' on' : '') + '"><input type="checkbox" ' + (f.empty ? 'checked' : '') +
-    ' onchange="S.form.empty=this.checked;render()"> 이 자리가 비었어요 (재고X)</label>';
+    ' onchange="S.form.empty=this.checked;render()"> 다 꺼내서 이 자리가 비었어요 (재고X)</label>';
   h += f.unitsOn
     ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
     : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
   h += '<div id="fSum"></div></div>';
-  h += bigBtn('', 'savePick()', '✓', '저장') + bigBtn('gray', 'back()', '←', '뒤로');
+  var ready = (parseInt(f.boxes || '0', 10) || 0) > 0 || (parseInt(f.units || '0', 10) || 0) > 0 || f.empty;
+  h += bigBtn(ready ? 'huge' : 'huge off', 'savePick()', '✓', saveLabel(f)) + bigBtn('gray', 'back()', '←', '뒤로');
   setTimeout(sumUpd, 0);
   return h;
 }
@@ -541,6 +592,11 @@ function sumUpd() {
       (per && b && Math.ceil(S._avail / per) !== b ? ' (재고 현황으로는 ' + Math.ceil(S._avail / per) + '박스예요. 다시 세어 보기)' : '') + '</div>';
   else if (!f.empty && S._avail && q > S._avail) h += '<div class="warn">재고 현황(' + n(S._avail) + '개)보다 많아요. 다 꺼냈으면 재고X를 눌러 주세요.</div>';
   el.innerHTML = h;
+  var sb = document.querySelector('.big.huge');   // 11/23 직접 넣기로 숫자를 칠 때도 저장 단추 글이 따라가게
+  if (sb && (S.view === 'pick' || S.view === 'back')) {
+    var bx = sb.querySelector('.bx'); if (bx && bx.firstChild) bx.firstChild.textContent = saveLabel(f);
+    sb.classList.toggle('off', !(b > 0 || u > 0 || (S.view === 'pick' && f.empty)));
+  }
 }
 function savePick() {
   var f = S.form, p = parseLoc(S.loc);
@@ -593,7 +649,7 @@ function startBack() {
   var p = parseLoc(S.loc);
   var codes = uniq(stockAt(p.full).map(function (r) { return r.code; }));
   liveLog().forEach(function (r) { if (r.kind === 'pick' && r.loc === p.full && codes.indexOf(r.code) < 0) codes.push(r.code); });
-  S.form = { kind: 'back', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: 1, units: '', unitsOn: false };
+  S.form = { kind: 'back', codes: codes, code: codes.length === 1 ? codes[0] : '', boxes: '', units: '', unitsOn: false };
   S.view = 'back'; S.msg = null; render();
 }
 function viewBack(p) {
@@ -601,14 +657,13 @@ function viewBack(p) {
   S._avail = 0; S._per = it ? it.per : 0;
   var h = '<div class="card"><h3>↩ Picking → ' + lc(p.full) + ' 되돌려 넣었어요</h3>' +
     '<div class="muted" style="margin-bottom:6px">피킹존에 둘 자리가 없어서 Bulk로 다시 넣을 때만 써요.</div>' + productPicker(f.codes, f.code);
-  h += '<p>되돌린 박스 수</p><div class="step"><button onclick="bump(-1)">−</button>' +
-    '<input type="number" inputmode="numeric" id="fBoxes" value="' + esc(f.boxes) + '" oninput="S.form.boxes=this.value;sumUpd()">' +
-    '<button onclick="bump(1)">+</button><span>박스</span></div>';
+  h += '<p>되돌린 박스 수를 눌러 주세요</p>' + boxPad(f);
   h += f.unitsOn
     ? '<p>낱개 수량 (박스로 안 맞을 때만)</p><input type="number" inputmode="numeric" id="fUnits" value="' + esc(f.units) + '" oninput="S.form.units=this.value;sumUpd()" placeholder="개">'
     : '<button class="small" onclick="S.form.unitsOn=true;render()">낱개 수량으로 넣기</button>';
   h += '<div id="fSum"></div></div>';
-  h += bigBtn('', 'saveBack()', '✓', '저장') + bigBtn('gray', 'back()', '←', '뒤로');
+  var ready = (parseInt(f.boxes || '0', 10) || 0) > 0 || (parseInt(f.units || '0', 10) || 0) > 0;
+  h += bigBtn(ready ? 'huge' : 'huge off', 'saveBack()', '✓', saveLabel(f)) + bigBtn('gray', 'back()', '←', '뒤로');
   setTimeout(sumUpd, 0);
   return h;
 }
@@ -693,12 +748,50 @@ function send(rec) {
   var box = outbox(); box.push(rec); setOutbox(box);
   S.data.log.push(Object.assign({ date: rec.time.slice(0, 10), status: '보내는 중' }, rec));
   saveCache();
-  S.msg = { t: 'ok', s: '✓ 저장했어요 (' + rec.time.slice(11, 16) + ')' + (navigator.onLine === false ? ' — 휴대폰에 저장, 연결되면 보내요' : '') };
-  S.view = 'loc'; S.form = null; render();
+  // 11/23 저장 뒤 화면 가득 큰 확인 + 휴대폰 진동 2초(김문수 님 "진동은 짧게 2초만") + 10초 동안 [방금 것 취소] → 10초 뒤 자리 화면으로
+  S.done = { rec: rec, at: Date.now(), offline: navigator.onLine === false };
+  S.view = 'done'; S.form = null; S.msg = null;
+  try { if (navigator.vibrate) navigator.vibrate(2000); } catch (e) {}
+  render();
+  clearInterval(S.doneTimer);
+  S.doneTimer = setInterval(function () {
+    if (S.view !== 'done' || !S.done) { clearInterval(S.doneTimer); return; }
+    if (Date.now() - S.done.at >= 10000) doneBack(); else render();
+  }, 1000);
   flush();
 }
-function cancelRec(id) {
-  if (!confirm('이 기록을 취소할까요?')) return;
+function doneWhat(r) {
+  var cnt = (r.boxes ? r.boxes + '박스' : '') + (r.units ? ' ' + n(r.units) + '개' : '');
+  var per = itemOf(r.code).per, q = r.units ? r.units : (r.boxes && per ? r.boxes * per : 0);
+  if (q && !r.units) cnt += ' (' + n(q) + '개)';
+  if (r.kind === 'pick') return { route: lc(r.loc, 'xl') + ' → <span class="lc pk xl">Picking</span>', cnt: cnt + (r.empty ? ' · 재고X' : '') };
+  if (r.kind === 'back') return { route: '<span class="lc pk xl">Picking</span> → ' + lc(r.loc, 'xl'), cnt: cnt };
+  return { route: lc(r.from, 'xl') + ' → ' + lc(r.to, 'xl'), cnt: '파레트 통째로' };
+}
+function viewDone() {
+  var r = S.done.rec, w = doneWhat(r), left = Math.max(0, 10 - Math.floor((Date.now() - S.done.at) / 1000));
+  return '<div class="card done"><div class="dk">✓</div><div class="dt">저장했어요</div><div class="dr">' + w.route + '</div>' +
+    '<div class="dn">' + esc(r.name || itemOf(r.code).name) + (w.cnt ? ' · ' + esc(w.cnt) : '') + '</div>' +
+    (S.done.offline ? '<div class="warn">인터넷이 안 돼서 휴대폰에 저장했어요 — 연결되면 보내요</div>' : '') +
+    '<div class="next">📷 다음 자리 QR을 찍으세요</div></div>' +
+    (left > 0 ? bigBtn('gray', 'undoDone()', '↩', '방금 것 취소 (' + left + '초)') : '') +
+    bigBtn('alt', 'doneBack()', '←', '이 자리 화면으로');
+}
+function doneBack() {
+  clearInterval(S.doneTimer);
+  var r = S.done && S.done.rec;
+  S.done = null; S.view = 'loc';
+  S.msg = r ? { t: 'ok', s: '✓ 저장했어요 (' + r.time.slice(11, 16) + ')' } : null;
+  render();
+}
+function undoDone() {
+  clearInterval(S.doneTimer);
+  var r = S.done && S.done.rec;
+  S.done = null; S.view = 'loc';
+  if (r) cancelRec(r.id, true); else render();
+}
+function cancelRec(id, noAsk) {
+  if (!noAsk && !confirm('이 기록을 취소할까요?')) return;
   var box = outbox();
   if (box.some(function (r) { return r.id === id; })) {           // 아직 안 보낸 기록 → 휴대폰에서만 지움
     setOutbox(box.filter(function (r) { return r.id !== id; }));

@@ -108,6 +108,17 @@
   .warn { background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; }
   .warn .pb { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .err { background:var(--red-soft); color:var(--red-ink); border:1px solid var(--red-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:700; }
+  /* 11/24 피킹존에 다른 LOT이 있으면 빨간 경고 (막지는 않음) */
+  .mix { background:var(--red-soft); color:var(--red-ink); border:2px solid var(--red); border-radius:14px; padding:12px 14px; margin:12px 0; }
+  .mix .mt { font-size:19px; font-weight:900; color:var(--red); }
+  .mix .mn { font-size:15px; font-weight:800; color:var(--ink); margin-top:2px; }
+  .mix .mr { margin-top:8px; }
+  .mix .mk { display:block; font-size:13px; font-weight:800; color:var(--red-ink); }
+  .mix .ids { margin:4px 0 0; gap:4px; }
+  .mix .lot { font-size:17px; padding:1px 8px; }
+  .mix .exp { font-size:14px; padding:2px 8px; }
+  .mix .mq { font-size:14px; font-weight:700; color:var(--ink2); margin-left:2px; }
+  .mix .ms { margin-top:8px; font-size:14.5px; font-weight:700; }
   .ok { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:12px; padding:12px 14px; margin:10px 0; font-weight:800; font-size:18px; }
   .muted, .sub { color:var(--mute); font-size:14px; }
   .card p.sub { font-weight:600; font-size:14px; color:var(--mute); }
@@ -171,7 +182,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-23a';
+var VERSION = '2026-11-24a';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -374,6 +385,47 @@ function lotsAt(full, code) {
   stockAt(full).forEach(function (r) { if (r.code === code && !seen[r.lot]) { seen[r.lot] = 1; o += lotChips(r.lot, r.exp); } });
   return o;
 }
+// ---- 11/24 김문수 님 "Bulk에서 꺼내는 재고의 유통기한(LOT)이 피킹존과 다르면 빨간 경고 — 섞여도 안 되는 건 아니지만 되도록 같이 두고 싶지 않음"
+// 피킹존 LOT = 재고 현황의 피킹존(자리 'Picking' 줄) + 오늘 휴대폰으로 Picking에 꺼낸 자리의 LOT (재고 현황 뒤에 꺼낸 것까지)
+function pickLots(code) {
+  var o = {};
+  function add(lot, exp, qty, today) {
+    var e = o[lot] || (o[lot] = { lot: lot, exp: exp, qty: 0, today: false });
+    e.qty += qty || 0; if (today) e.today = true; if (!e.exp && exp) e.exp = exp;
+  }
+  S.data.stock.forEach(function (r) { if (r.loc === 'Picking' && r.code === code && (r.stock > 0 || r.avail > 0)) add(r.lot, r.exp, r.stock || r.avail, false); });
+  liveLog().forEach(function (r) {
+    if (r.kind !== 'pick' || r.code !== code) return;
+    stockAt(r.loc).forEach(function (s) { if (s.code === code) add(s.lot, s.exp, 0, true); });
+  });
+  return o;
+}
+// 이 Bulk 자리에서 꺼내는 LOT과 다른 LOT이 피킹존에 있으면 {mine, other}, 없거나 모르면 null
+function lotMix(full, code) {
+  if (!S.data || !full || !code) return null;
+  var mine = {};
+  stockAt(full).forEach(function (r) { if (r.code === code && !mine[r.lot]) mine[r.lot] = r; });
+  var ml = Object.keys(mine);
+  if (!ml.length) return null;                         // 재고 현황에 없는 자리·품목 → LOT을 몰라서 안 봄
+  var pk = pickLots(code), other = [];
+  Object.keys(pk).forEach(function (l) { if (!mine[l]) other.push(pk[l]); });
+  if (!other.length) return null;
+  other.sort(function (a, b) { return (a.exp || '9999') < (b.exp || '9999') ? -1 : 1; });
+  return { mine: ml.map(function (k) { return mine[k]; }), other: other };
+}
+function mixWarn(full, code, withName) {
+  var m = lotMix(full, code);
+  if (!m) return '';
+  var h = '<div class="mix"><div class="mt">⚠ 피킹존에 다른 LOT이 있어요</div>' +
+    (withName ? '<div class="mn">' + esc(itemOf(code).name) + '</div>' : '') +
+    '<div class="mr"><span class="mk">피킹존에 있는 것</span>';
+  m.other.forEach(function (e) {
+    h += lotChips(e.lot, e.exp) + '<span class="mq">' + (e.qty ? n(e.qty) + '개' : '') + (e.today ? (e.qty ? ' · ' : '') + '오늘 꺼냄' : '') + '</span>';
+  });
+  h += '</div><div class="mr"><span class="mk">지금 꺼내는 것 (' + esc(shortOf(full)) + ')</span>';
+  m.mine.forEach(function (r) { h += lotChips(r.lot, r.exp); });
+  return h + '</div><div class="ms">되도록 섞이지 않게 넣어 주세요 (저장은 돼요)</div></div>';
+}
 function bigBtn(cls, on, ic, t, sub) {
   return '<button class="big' + (cls ? ' ' + cls : '') + '" onclick="' + on + '"><span class="ic">' + ic + '</span><span class="bx">' + t +
     (sub ? '<small>' + sub + '</small>' : '') + '</span></button>';
@@ -462,6 +514,9 @@ function recLine(r) {
 function viewLoc(p) {
   var rows = stockAt(p.full);
   var h = stockCard(p);
+  // 11/24 피킹존에 다른 LOT이 있으면 [Picking으로 꺼냈어요] 위에 빨간 경고 (품목이 여럿이면 품목마다)
+  var codes = uniq(rows.map(function (r) { return r.code; }));
+  codes.forEach(function (c) { h += mixWarn(p.full, c, codes.length > 1); });
   // 11/23 첫 화면 단순하게: 가장 많이 쓰는 [Picking으로 꺼냈어요]만 아주 크게, 나머지는 아래 '다른 작업'에 작게
   h += bigBtn('huge', 'startPick()', '📦', 'Picking으로 꺼냈어요');
   h += '<div class="others"><div class="oh">다른 작업</div>' +
@@ -567,6 +622,7 @@ function viewPick(p) {
   S._avail = f.code ? stockAt(p.full).filter(function (r) { return r.code === f.code; }).reduce(function (a, r) { return a + r.avail; }, 0) : 0;
   S._per = it ? it.per : 0;
   var h = '<div class="card"><h3>📦 ' + lc(p.full) + ' → Picking으로 꺼냈어요</h3>' + productPicker(f.codes, f.code, p.full);
+  h += mixWarn(p.full, f.code, false);   // 11/24 피킹존에 다른 LOT이 있으면 빨간 경고
   h += '<p>꺼낸 박스 수를 눌러 주세요</p>' + boxPad(f);
   h += '<label class="chk' + (f.empty ? ' on' : '') + '"><input type="checkbox" ' + (f.empty ? 'checked' : '') +
     ' onchange="S.form.empty=this.checked;render()"> 다 꺼내서 이 자리가 비었어요 (재고X)</label>';

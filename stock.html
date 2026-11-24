@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>메디포스트 재고 현황</title>
+<style>
+  /* 2026-11-24 김문수 님 "휴대폰으로 큐알 촬영하면 가장 최근에 올라온 재고현황을 확인할 수 있게"
+     재고이동 화면(index.html)과 같은 밝은 테마 — 연한 바탕 · 흰 카드 · 초록. 자리 = 초록 상자, LOT = 파란 상자 */
+  :root { --bg:#eef2f1; --card:#fff; --ink:#1f2d2a; --ink2:#4d5d59; --mute:#5f6f6b; --line:#dce4e1; --edge:#e1e8e5;
+          --go:#12804f; --go-ink:#0f6e47; --go-soft:#e2f3ea; --go-line:#bfe3cf;
+          --amber:#94600c; --amber-ink:#7a4f0a; --amber-soft:#fff3d6; --amber-line:#f0d8a0;
+          --red:#c93c3c; --red-ink:#9b2c2c; --red-soft:#fdeaea; --red-line:#f3c4c4;
+          --blue-ink:#1f4f9e; --blue-soft:#e8f0fc; --blue-line:#c9daf6; --gray-soft:#eef1f0;
+          --sh:0 1px 2px rgba(20,40,35,.05),0 4px 14px rgba(20,40,35,.06); }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.5 "Malgun Gothic","Apple SD Gothic Neo",system-ui,-apple-system,"Noto Sans KR",sans-serif;
+         word-break:keep-all; overflow-wrap:break-word; }
+  button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .wrap { max-width:560px; margin:0 auto; padding:0 14px 60px; }
+  .bar { display:flex; align-items:center; gap:10px; margin:0 -14px 12px; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); }
+  .bar svg { width:32px; height:32px; flex:none; }
+  .bar .bt { flex:1; min-width:0; line-height:1.25; }
+  .bar .bt b { display:block; font-size:16px; letter-spacing:-.3px; }
+  .bar .bt small { display:block; font-size:12px; color:var(--mute); }
+  .bar a { color:var(--blue-ink); font-weight:700; font-size:14px; text-decoration:none; white-space:nowrap; }
+  /* 언제 것인지 — 가장 먼저 보이게 */
+  .wc { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--edge); border-left:6px solid var(--go);
+        border-radius:16px; box-shadow:var(--sh); padding:10px 14px 12px 16px; margin:0 0 10px; }
+  .wc.old { border-left-color:var(--amber); }
+  .wc .wl { flex:1; min-width:0; }
+  .wc .wk { font-size:13px; font-weight:800; color:var(--mute); }
+  .wc .wt { font-size:clamp(17px, 5.4vw, 22px); line-height:1.3; font-weight:900; font-variant-numeric:tabular-nums; }
+  .wc .ws { font-size:14px; font-weight:700; color:var(--ink2); }
+  .wc button { flex:none; width:78px; min-height:54px; padding:6px 4px; line-height:1.3; border-radius:12px; border:1.5px solid var(--go-line); background:#fff; color:var(--go-ink); font-size:16px; font-weight:800; }
+  .wc button:active { background:var(--go-soft); }
+  .warn { background:var(--amber-soft); color:var(--amber-ink); border:1px solid var(--amber-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; font-weight:700; }
+  .err { background:var(--red-soft); color:var(--red-ink); border:1px solid var(--red-line); border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:700; }
+  .muted, .sub { color:var(--mute); font-size:14px; }
+  /* 찾기 · 고르기 (내려도 위에 붙어 있음) */
+  .stick { position:sticky; top:0; z-index:3; background:var(--bg); padding:8px 0 8px; }
+  input[type=search], input[type=password] { width:100%; height:54px; font-size:18px; padding:6px 14px; border:1.5px solid #cfd9d5; border-radius:12px; background:#fff; color:var(--ink); font-family:inherit; -webkit-appearance:none; appearance:none; }
+  input:focus { outline:none; border-color:var(--go); box-shadow:0 0 0 3px var(--go-soft); }
+  .seg { display:flex; gap:8px; margin:0 0 8px; }
+  .seg button { flex:1; min-height:46px; padding:4px 6px; border-radius:12px; border:1.5px solid #d3ddd9; background:#fff; color:var(--ink2); font-size:16px; font-weight:800; line-height:1.2; }
+  .seg button small { display:block; font-size:12px; font-weight:700; color:var(--mute); }
+  .seg button.sel { border:2px solid var(--go); background:var(--go-soft); color:var(--go-ink); }
+  .seg button.sel small { color:var(--go-ink); }
+  .seg.rows { flex-wrap:wrap; }
+  .seg.rows button { flex:1 0 13%; font-size:19px; font-weight:900; }
+  .cnt { font-size:14px; font-weight:700; color:var(--mute); margin:6px 2px 8px; }
+  /* 품목 카드 */
+  .it { background:var(--card); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--sh); margin:10px 0; overflow:hidden; }
+  .it.on { border:2px solid var(--go); }
+  .it.zero { box-shadow:none; background:#f7f9f8; }
+  .ih { display:flex; align-items:flex-start; gap:10px; width:100%; padding:12px 14px; border:0; background:transparent; text-align:left; color:var(--ink); font-size:17px; }
+  .ih .il { flex:1; min-width:0; }
+  .pn { display:block; font-size:19px; font-weight:800; line-height:1.3; overflow-wrap:anywhere; }
+  .pc { display:block; font-size:13px; font-weight:700; color:var(--mute); letter-spacing:.3px; }
+  .zs { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+  .z { display:inline-flex; align-items:baseline; gap:5px; padding:1px 10px; border-radius:999px; font-size:14px; font-weight:700; white-space:nowrap;
+       background:var(--gray-soft); color:var(--ink2); border:1px solid var(--line); }
+  .z b { font-size:16px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .z.bk { background:var(--go-soft); border-color:var(--go-line); color:var(--go-ink); }
+  .z.bk b { color:var(--go-ink); }
+  .z.none { background:var(--amber-soft); border-color:var(--amber-line); color:var(--amber-ink); }
+  .z.none b { color:var(--amber-ink); }
+  .z.bad { background:var(--red-soft); border-color:var(--red-line); color:var(--red-ink); }
+  .ir { flex:none; text-align:right; line-height:1.2; }
+  .ir b { font-size:27px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .ir small { font-size:15px; font-weight:700; color:var(--ink2); margin-left:1px; }
+  .ir em { display:block; font-style:normal; font-size:13.5px; font-weight:700; color:var(--mute); margin-top:2px; }
+  .ir i { display:block; font-style:normal; font-size:13px; font-weight:800; color:var(--go-ink); margin-top:6px; }
+  .it.zero .ir b { font-size:17px; color:var(--mute); }
+  .idt { border-top:1px solid var(--line); padding:4px 14px 12px; background:#fbfdfc; }
+  .lt { padding:10px 0 6px; border-top:1px dashed var(--line); }
+  .lt:first-child { border-top:0; }
+  .ids { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
+  .lot, .exp { display:inline-flex; align-items:baseline; gap:6px; padding:2px 10px; border-radius:9px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .lot { background:var(--blue-soft); border:1px solid var(--blue-line); color:var(--blue-ink); font-size:18px; font-weight:900; letter-spacing:.5px; }
+  .exp { background:var(--gray-soft); border:1px solid var(--line); color:var(--ink); font-size:15px; font-weight:700; }
+  .exp.over { background:var(--red-soft); border-color:var(--red-line); color:var(--red-ink); }
+  .lot i, .exp i { font-style:normal; font-size:12px; font-weight:800; letter-spacing:0; }
+  .lr { display:flex; align-items:baseline; gap:8px; padding:4px 0; font-size:16px; color:var(--ink2); }
+  .lr b { font-size:19px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .lr .lc { min-width:86px; text-align:center; }
+  .lc { display:inline-block; padding:0 8px; border-radius:8px; background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line);
+        font-size:17px; font-weight:900; letter-spacing:.3px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .lc.pk { background:var(--gray-soft); color:var(--ink); border-color:var(--line); font-weight:800; }
+  .lc.xl { font-size:24px; padding:1px 12px; border-radius:10px; }
+  .lv { display:inline-flex; align-items:center; padding:1px 12px; border-radius:999px; font-size:15px; font-weight:900; background:var(--gray-soft); color:var(--ink2); border:1px solid var(--line); }
+  .lv.l1 { background:var(--go-soft); color:var(--go-ink); border-color:var(--go-line); }
+  /* 자리 카드 */
+  .pl { background:var(--card); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--sh); margin:10px 0; padding:12px 14px; }
+  .pl .ph { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .pl .pr { padding:8px 0 4px; border-top:1px solid var(--line); }
+  .pl .pr:first-of-type { border-top:0; }
+  .pl .pn { font-size:18px; }
+  .pl .q { font-size:15px; color:var(--ink2); margin-top:4px; }
+  .pl .q b { font-size:21px; font-weight:900; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .card { background:var(--card); border:1px solid var(--edge); border-radius:16px; box-shadow:var(--sh); padding:14px 16px; margin:12px 0; }
+  .card h3 { margin:0 0 8px; font-size:17px; font-weight:800; }
+  .card p { margin:12px 0 6px; font-size:15px; font-weight:700; color:var(--ink2); }
+  .big { display:block; width:100%; min-height:58px; margin:12px 0 6px; border-radius:14px; border:0; background:linear-gradient(90deg,#16915b,#12804f); color:#fff; font-size:19px; font-weight:800; }
+  .empty { text-align:center; color:var(--mute); padding:26px 10px; font-weight:700; }
+  .foot { margin-top:22px; text-align:center; color:var(--mute); font-size:12px; line-height:1.7; }
+  @media (max-width:360px) { .pn { font-size:17px; } .ir b { font-size:23px; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="muted">불러오는 중…</p></div>
+
+<script src="config.js"></script>
+<script>
+/* 메디포스트 휴대폰 재고 현황 (GitHub Pages) — 2026-11-24 Claude Code
+ * QR(이 주소 stock.html) → 구글 웹앱(config.js apiUrl)에서 '가장 최근에 올라온 재고 현황'을 받아 보여 줌. 보기만 하고 아무것도 안 고침.
+ * 재고는 사무실 PC(업무허브)가 EMP [재고 현황]을 받을 때마다 구글 [재고] 시트에 올려 둔 것 (재고이동 화면 index.html과 같은 자료·같은 현장 비밀번호).
+ * 자리 이름: 'D2-J2-06-00' = Bulk 선반, 'Picking'·'Picking·기타' = 피킹존(품목·LOT별 합), 'Bulk·…' = Bulk인데 선반 번호가 아닌 자리, '기타·…' = 다른 창고.
+ * 받은 자료는 휴대폰에 저장해 두어, 인터넷이 끊겨도 마지막으로 받은 것을 보여 준다. */
+var VERSION = 'stock-2026-11-24a';
+var CFG = window.MEDI_MOVE_CONFIG || {};
+var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
+var K = { pin: 'mm_pin', cache: 'mm_stock_view', old: 'mm_cache', ui: 'mm_stock_ui' };   // mm_pin 은 재고이동 화면과 같이 씀
+var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
+function lsJson(k, d) { try { var v = JSON.parse(lsGet(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function n(v) { return Number(v || 0).toLocaleString('ko-KR'); }
+function $(id) { return document.getElementById(id); }
+function pad(x) { return (x < 10 ? '0' : '') + x; }
+function nowText(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function norm(s) { return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ''); }
+
+var UI = lsJson(K.ui, {});
+var S = { pin: lsGet(K.pin), data: null, M: null, fresh: false, failed: '', loading: false, pinMsg: '', lastLoad: 0,
+          q: '', view: UI.view === 'loc' ? 'loc' : 'item', kind: ['prod', 'etc', 'all'].indexOf(UI.kind) >= 0 ? UI.kind : 'prod', row: UI.row || '', open: {} };
+function saveUi() { lsSet(K.ui, JSON.stringify({ view: S.view, kind: S.kind, row: S.row })); }
+
+// ---------------------------------------------------------------- 자리 · 품목 구분
+function parseLoc(s) {
+  s = String(s || '').toUpperCase().replace(/\s/g, '');
+  var m = s.match(/^D2-([A-Z])(\d)-(\d{1,2})-00$/);
+  if (!m) return null;
+  var bay = parseInt(m[3], 10), lv = parseInt(m[2], 10);
+  return { short: m[1] + lv + '-' + pad(bay), full: s, row: m[1], level: lv, bay: bay };
+}
+// 줄 → 칸 → 단 순서 (같은 칸의 1·2·3단이 붙어 나오게)
+function zoneOf(loc) {
+  loc = String(loc || '');
+  if (loc === 'Picking' || loc.indexOf('Picking·') === 0) return { z: 'pick', label: '피킹존' };
+  if (loc.indexOf('Bulk·') === 0) return { z: 'bulk', label: loc.slice(5), row: '기타', sort: 'z' + loc };
+  if (loc.indexOf('기타·') === 0) return { z: 'bulk', label: loc.slice(3), row: '기타', sort: 'zz' + loc };
+  var p = parseLoc(loc);
+  if (p) return { z: 'bulk', label: p.short, row: p.row, level: p.level, sort: p.row + pad(p.bay) + p.level };
+  return { z: 'bulk', label: loc, row: '기타', sort: 'z' + loc };
+}
+// 제품 = 2WL(건기식)·2MP 가운데 보틀·파우치 같은 부자재 이름이 아닌 것 (재고이동 화면 isProduct · 업무허브 move_calc.is_product 와 같게)
+var SUPPLY_WORDS = ['보틀', '파우치', '쇼핑백', '선물박스', '리플릿', '리플렛', '안내지', '스티커', '봉투'];
+function isProduct(code, name) {
+  return /^(2WL|2MP)/.test(code) && !SUPPLY_WORDS.some(function (w) { return String(name || '').indexOf(w) >= 0; });
+}
+function byName(a, b) { return String(a.name).localeCompare(String(b.name), 'ko') || (a.code < b.code ? -1 : 1); }
+
+// 받은 자료 → 품목별(items) · 자리별(locs)
+function build(d) {
+  var info = {}, by = {}, locs = {}, today = nowText().slice(0, 10);
+  (d.items || []).forEach(function (it) { info[it.code] = it; });
+  (d.stock || []).forEach(function (r) {
+    if (!(r.avail > 0 || r.stock > 0)) return;
+    var z = zoneOf(r.loc), inf = info[r.code] || {}, a = r.avail > 0 ? r.avail : 0, st = r.stock > 0 ? r.stock : 0;
+    var it = by[r.code] || (by[r.code] = { code: r.code, name: r.name || inf.name || r.code, per: inf.per || 0, pick: 0, bulk: 0, stock: 0, lots: {}, places: {} });
+    it.stock += st;
+    var L = it.lots[r.lot || ''] || (it.lots[r.lot || ''] = { lot: r.lot || '', exp: r.exp || '', pick: 0, pickStock: 0, hasPick: false, at: [] });
+    if (!L.exp && r.exp) L.exp = r.exp;
+    if (z.z === 'pick') { it.pick += a; L.pick += a; L.pickStock += st; L.hasPick = true; return; }
+    it.bulk += a; it.places[z.label] = 1;
+    var hit = L.at.filter(function (x) { return x.label === z.label; })[0];
+    if (hit) { hit.qty += a; hit.stock += st; } else L.at.push({ label: z.label, sort: z.sort, qty: a, stock: st });
+    var P = locs[z.label] || (locs[z.label] = { label: z.label, row: z.row, level: z.level || 0, sort: z.sort, rows: [], key: norm(z.label) });
+    P.rows.push({ code: r.code, name: it.name, lot: r.lot || '', exp: r.exp || '', qty: a, stock: st });
+  });
+  var items = Object.keys(by).map(function (c) {
+    var it = by[c];
+    it.total = it.pick + it.bulk;
+    it.prod = isProduct(it.code, it.name);
+    it.nloc = Object.keys(it.places).length;
+    it.lotList = Object.keys(it.lots).map(function (k) { return it.lots[k]; }).sort(function (a, b) {
+      var x = a.exp || '9999', y = b.exp || '9999'; return x < y ? -1 : x > y ? 1 : a.lot < b.lot ? -1 : 1;
+    });
+    it.lotList.forEach(function (L) { L.at.sort(function (a, b) { return a.sort < b.sort ? -1 : 1; }); });
+    it.over = it.prod && it.lotList.some(function (L) { return L.exp && L.exp < today; });
+    it.key = norm(it.name + ' ' + it.code + ' ' + it.lotList.map(function (L) { return L.lot; }).join(' ') + ' ' + Object.keys(it.places).join(' '));
+    return it;
+  }).sort(byName);
+  var zero = (d.items || []).filter(function (x) { return !by[x.code]; }).map(function (x) {
+    return { code: x.code, name: x.name || x.code, per: x.per || 0, prod: isProduct(x.code, x.name), key: norm((x.name || '') + ' ' + x.code) };
+  }).sort(byName);
+  var locList = Object.keys(locs).map(function (k) { return locs[k]; }).sort(function (a, b) { return a.sort < b.sort ? -1 : 1; });
+  locList.forEach(function (P) {
+    P.rows.sort(byName);
+    P.key += norm(' ' + P.rows.map(function (r) { return r.name + ' ' + r.code + ' ' + r.lot; }).join(' '));
+  });
+  var rows = {}, order = [];
+  locList.forEach(function (P) { rows[P.row] = (rows[P.row] || 0) + 1; });
+  ROWS.forEach(function (r) { if (rows[r]) order.push(r); });
+  Object.keys(rows).sort().forEach(function (r) { if (order.indexOf(r) < 0 && r !== '기타') order.push(r); });
+  if (rows['기타']) order.push('기타');
+  return { items: items, zero: zero, locs: locList, rowCount: rows, rowOrder: order, today: today,
+           nProd: items.filter(function (x) { return x.prod; }).length, nEtc: items.filter(function (x) { return !x.prod; }).length };
+}
+
+// ---------------------------------------------------------------- 구글 웹앱 부르기 (재고이동 화면과 같은 방식: 3번까지 다시)
+function api(action) {
+  if (!CFG.apiUrl) return Promise.reject({ code: 'setup', message: 'config.js에 구글 웹앱 주소가 아직 없어요 (사무실에 알려 주세요)' });
+  var body = JSON.stringify({ action: action, pin: S.pin }), attempt = 0;
+  function once() {
+    var slow = new Promise(function (_, rej) { setTimeout(function () { rej(0); }, 20000); });   // 20초 넘으면 그만 기다림
+    return Promise.race([fetch(CFG.apiUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, redirect: 'follow' }), slow])
+      .then(function (r) { if (!r.ok) throw { code: 'network', message: 'HTTP ' + r.status }; return r.json(); }, function () { throw { code: 'network', message: '인터넷 연결을 확인해 주세요' }; })
+      .then(function (j) {
+        if (!j.ok) throw { code: j.error === 'pin' ? 'pin' : 'server', message: j.error || '오류' };
+        if (j.kind !== 'data') throw { code: 'network', message: '구글 응답이 이상해요' };
+        return j;
+      });
+  }
+  function loop() {
+    return once().catch(function (e) {
+      if (e.code !== 'network' || ++attempt >= 3) throw e;
+      return new Promise(function (r) { setTimeout(r, 600 * attempt); }).then(loop);
+    });
+  }
+  return loop();
+}
+function load() {
+  if (!S.pin || S.loading) return;
+  S.loading = true; S.lastLoad = Date.now(); render();
+  api('phoneData').then(function (res) {
+    var st = String(res.stockTime || '');
+    // 재고 현황을 받은 뒤 휴대폰으로 옮긴 기록 수 (아직 이 재고에 안 들어간 것)
+    var moved = (res.log || []).filter(function (r) { return r.status !== '취소' && r.status !== '안 들어감' && String(r.time || '').replace(' ', 'T') > st; }).length;
+    S.data = { at: nowText(), stockTime: st, stock: res.stock || [], items: res.items || [], moved: moved };
+    S.M = build(S.data); S.fresh = true; S.failed = ''; S.loading = false;
+    lsSet(K.cache, JSON.stringify(S.data));
+    render();
+  }).catch(function (e) {
+    S.loading = false;
+    if (e.code === 'pin') { S.pin = ''; lsSet(K.pin, null); S.pinMsg = '현장 비밀번호가 맞지 않아요. 사무실에 물어보세요'; render(); return; }
+    S.fresh = false; S.failed = e.message || '오류';
+    render();
+  });
+}
+
+// ---------------------------------------------------------------- 화면 조각
+var LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cf2b0"/><stop offset="1" stop-color="#16a66a"/></linearGradient></defs><path d="M24 4L44 42H33L24 24L15 42H4Z" fill="url(#lg1)"/><path d="M17 33h14" stroke="#ffffff" stroke-width="4"/></svg>';
+function lotChips(lot, exp, flag) {
+  if (String(exp || '').slice(0, 4) === '9999') exp = '';   // 9999-12-31 = 유통기한 없는 품목(부자재)
+  if (!lot && !exp) return '';
+  var over = flag && exp && S.M && exp < S.M.today;
+  return '<div class="ids">' + (lot ? '<span class="lot"><i>LOT</i>' + esc(lot) + '</span>' : '') +
+    (exp ? '<span class="exp' + (over ? ' over' : '') + '"><i>유통기한' + (over ? ' 지남' : '') + '</i>' + esc(exp) + '</span>' : '') + '</div>';
+}
+function boxText(q, per) {
+  if (!(per > 1) || !q) return '';   // 박스당 1개(낱개로 세는 품목)는 박스 표시 안 함
+  var b = Math.floor(q / per), r = q % per;
+  return b ? n(b) + '박스' + (r ? ' + ' + n(r) + '개' : '') : '';
+}
+function parseT(s) { var m = String(s || '').match(/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)/); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; }
+function agoText(t) {
+  var m = Math.floor((Date.now() - t.getTime()) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return m + '분 전';
+  if (m < 1440) return Math.floor(m / 60) + '시간' + (m % 60 ? ' ' + (m % 60) + '분' : '') + ' 전';
+  return Math.floor(m / 1440) + '일 전';
+}
+function whenCard() {
+  var t = parseT(S.data.stockTime), now = new Date();
+  var same = t && t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth() && t.getDate() === now.getDate();
+  var h = '<div class="wc' + (same ? '' : ' old') + '"><div class="wl"><div class="wk">가장 최근에 올라온 재고 현황</div>' +
+    '<div class="wt">' + (t ? (t.getMonth() + 1) + '월 ' + t.getDate() + '일 (' + DAYS[t.getDay()] + ') ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) : '아직 없어요') + '</div>' +
+    '<div class="ws">' + (t ? agoText(t) + ' · EMP 재고 현황 기준' : '사무실 PC가 재고 현황을 올리면 보여요') + '</div></div>' +
+    '<button onclick="load()">' + (S.loading ? '받는<br>중…' : '↻ 새로<br>받기') + '</button></div>';
+  if (t && !same) h += '<div class="warn">⚠ 오늘 재고 현황이 아직 안 올라왔어요. 위 날짜의 재고예요.</div>';
+  if (S.failed) h += '<div class="warn">인터넷이 안 돼서 이 휴대폰에 저장해 둔 것을 보여 줘요 (' + esc(String(S.data.at || '').slice(5, 16)) + '에 받음)</div>';
+  if (S.data.moved) h += '<div class="warn">이 재고 현황 뒤에 휴대폰으로 옮긴 ' + n(S.data.moved) + '건은 아직 들어가지 않았어요</div>';
+  return h;
+}
+function pinBox() {
+  return (S.pinMsg ? '<div class="err">' + esc(S.pinMsg) + '</div>' : '') +
+    '<div class="card"><h3>처음 한 번만 넣어요</h3><p>현장 비밀번호 (사무실에 물어보기)</p>' +
+    '<input type="password" inputmode="numeric" id="wPin" placeholder="••••" onkeydown="if(event.key===\'Enter\')savePin()">' +
+    '<button class="big" onclick="savePin()">재고 현황 보기</button><div class="muted">이 휴대폰에만 저장돼요. 재고이동 화면과 같은 비밀번호예요.</div></div>';
+}
+function savePin() {
+  var pin = $('wPin').value.trim();
+  if (!pin) { S.pinMsg = '현장 비밀번호를 넣어 주세요'; render(); return; }
+  S.pin = pin; lsSet(K.pin, pin); S.pinMsg = ''; render(); load();
+}
+
+function itemCard(it) {
+  var open = !!S.open[it.code];
+  var h = '<div class="it' + (open ? ' on' : '') + '"><button class="ih" data-code="' + esc(it.code) + '" aria-expanded="' + open + '">' +
+    '<span class="il"><span class="pn">' + esc(it.name) + '</span><span class="pc">' + esc(it.code) + (it.per > 1 ? ' · 박스당 ' + n(it.per) + '개' : '') + '</span><span class="zs">';
+  if (it.pick > 0) h += '<span class="z">피킹존 <b>' + n(it.pick) + '</b></span>';
+  else if (it.prod) h += '<span class="z none">피킹존 <b>0</b></span>';
+  if (it.bulk > 0) h += '<span class="z bk">Bulk <b>' + n(it.bulk) + '</b> · ' + it.nloc + '자리</span>';
+  else if (it.prod) h += '<span class="z none">Bulk <b>0</b></span>';
+  if (it.over) h += '<span class="z bad">유통기한 지난 LOT 있음</span>';
+  h += '</span></span><span class="ir"><b>' + n(it.total) + '</b><small>개</small>' +
+    (it.per > 1 && it.total >= it.per ? '<em>약 ' + n(Math.ceil(it.total / it.per)) + '박스</em>' : '') + '<i>' + (open ? '접기 ▲' : 'LOT·자리 ▼') + '</i></span></button>';
+  if (open) h += itemDetail(it);
+  return h + '</div>';
+}
+function itemDetail(it) {
+  var h = '<div class="idt">';
+  it.lotList.forEach(function (L) {
+    h += '<div class="lt">' + lotChips(L.lot, L.exp, it.prod);
+    if (L.hasPick) h += '<div class="lr"><span class="lc pk">피킹존</span><span><b>' + n(L.pick) + '</b>개' + (L.pickStock !== L.pick ? ' <span class="sub">· 재고 ' + n(L.pickStock) + '</span>' : '') + '</span></div>';
+    L.at.forEach(function (a) {
+      var bx = boxText(a.qty, it.per);
+      h += '<div class="lr"><span class="lc">' + esc(a.label) + '</span><span><b>' + n(a.qty) + '</b>개' + (bx ? ' <span class="sub">· ' + bx + '</span>' : '') +
+        (a.stock !== a.qty ? ' <span class="sub">· 재고 ' + n(a.stock) + '</span>' : '') + '</span></div>';
+    });
+    h += '</div>';
+  });
+  if (it.stock !== it.total) h += '<div class="sub" style="margin-top:6px">선반에 있는 재고 ' + n(it.stock) + '개 가운데 주문에 잡힌 ' + n(it.stock - it.total) + '개를 뺀 수량이에요</div>';
+  return h + '</div>';
+}
+function zeroCard(x) {
+  return '<div class="it zero"><div class="ih"><span class="il"><span class="pn">' + esc(x.name) + '</span><span class="pc">' + esc(x.code) + '</span></span>' +
+    '<span class="ir"><b>재고 없음</b></span></div></div>';
+}
+function placeCard(P) {
+  var h = '<div class="pl"><div class="ph"><span class="lc xl">' + esc(P.label) + '</span>' + (P.level ? '<span class="lv' + (P.level === 1 ? ' l1' : '') + '">' + P.level + '단</span>' : '') + '</div>';
+  var per = {};
+  S.M.items.forEach(function (it) { per[it.code] = it.per; });
+  P.rows.forEach(function (r) {
+    var bx = boxText(r.qty, per[r.code]);
+    h += '<div class="pr"><span class="pn">' + esc(r.name) + '</span><span class="pc">' + esc(r.code) + '</span>' + lotChips(r.lot, r.exp, isProduct(r.code, r.name)) +
+      '<div class="q"><b>' + n(r.qty) + '</b>개' + (bx ? ' · ' + bx : '') + (r.stock !== r.qty ? ' <span class="sub">· 재고 ' + n(r.stock) + '</span>' : '') + '</div></div>';
+  });
+  return h + '</div>';
+}
+
+// 목록만 다시 그림 (찾기 칸에 글자를 넣는 동안 칸이 안 흔들리게)
+function renderList() {
+  var M = S.M, q = norm(S.q), h = '', box = $('list');
+  if (!box || !M) return;
+  if (S.view === 'item') {
+    var list = M.items.filter(function (it) { return (S.kind === 'all' || (S.kind === 'prod') === it.prod) && (!q || it.key.indexOf(q) >= 0); });
+    var zero = M.zero.filter(function (x) { return q ? x.key.indexOf(q) >= 0 : false; });
+    if (q && !list.length && !zero.length) {   // 고른 종류에 없으면 다른 종류에서도 찾아 줌
+      list = M.items.filter(function (it) { return it.key.indexOf(q) >= 0; });
+      if (list.length) h += '<div class="cnt">고른 종류에는 없어서 전체에서 찾았어요</div>';
+    }
+    h += '<div class="cnt">' + (q ? '찾은 품목 ' : '품목 ') + n(list.length) + '개' + (zero.length ? ' · 재고 없는 품목 ' + zero.length + '개' : '') +
+      ' <span style="font-weight:600">· 수량은 가용(주문에 잡힌 것 뺌) 기준</span></div>';
+    list.forEach(function (it) { h += itemCard(it); });
+    zero.forEach(function (x) { h += zeroCard(x); });
+    if (!list.length && !zero.length) h += '<div class="empty">' + (q ? '찾는 품목이 없어요' : '재고가 없어요') + '</div>';
+    if (!q && S.kind === 'all' && M.zero.length) {
+      h += '<details class="card"><summary style="font-weight:800;color:var(--ink2)">재고 현황에 0으로 나온 품목 ' + M.zero.length + '개</summary><div style="margin-top:8px;font-size:15px;line-height:1.9">' +
+        M.zero.map(function (x) { return esc(x.name) + ' <span class="sub">' + esc(x.code) + '</span>'; }).join('<br>') + '</div></details>';
+    }
+  } else {
+    var row = M.rowOrder.indexOf(S.row) >= 0 ? S.row : M.rowOrder[0];
+    var pl = M.locs.filter(function (P) { return q ? P.key.indexOf(q) >= 0 : P.row === row; });
+    h += '<div class="cnt">' + (q ? '찾은 자리 ' : esc(row || '') + (row === '기타' ? ' (선반 번호가 아닌 자리) ' : '줄 ')) + n(pl.length) + '곳 · Bulk만 (피킹존은 품목별에서)</div>';
+    pl.forEach(function (P) { h += placeCard(P); });
+    if (!pl.length) h += '<div class="empty">' + (q ? '찾는 자리가 없어요' : '재고가 있는 자리가 없어요') + '</div>';
+  }
+  box.innerHTML = h;
+}
+function setView(v) { S.view = v; saveUi(); render(); }
+function setKind(k) { S.kind = k; saveUi(); render(); }
+function setRow(r) { S.row = r; saveUi(); render(); window.scrollTo(0, 0); }
+function seg(on, sel, label, small) { return '<button class="' + (sel ? 'sel' : '') + '" onclick="' + on + '">' + label + (small != null ? '<small>' + small + '</small>' : '') + '</button>'; }
+
+function render() {
+  var keep = document.activeElement && document.activeElement.id === 'q';
+  var h = '<div class="bar">' + LOGO + '<div class="bt"><b>메디포스트</b><small>재고 현황 · 오현물류</small></div><a href="index.html">📦 재고이동</a></div>';
+  var foot = '<div class="foot">보기만 하는 화면이에요 (아무것도 바뀌지 않아요)<br>메디포스트 재고 현황 · ' + VERSION + '</div>';
+  if (!CFG.apiUrl) h += '<div class="err">설정 전: config.js에 구글 웹앱 주소가 없어요</div>';
+  if (!S.pin) { $('app').innerHTML = h + pinBox() + foot; return; }
+  if (!S.data) {
+    h += S.failed ? '<div class="err">재고 현황을 못 받았어요. 인터넷이 되는 곳에서 다시 해 주세요. (' + esc(S.failed) + ')</div><button class="big" onclick="load()">다시 받기</button>'
+                  : '<p class="muted">재고 현황을 받는 중…</p>';
+    $('app').innerHTML = h + foot; return;
+  }
+  var M = S.M;
+  h += whenCard();
+  h += '<div class="stick"><input type="search" id="q" autocomplete="off" enterkeyhint="search" placeholder="🔎 제품 이름 · 코드 · LOT · 자리" value="' + esc(S.q) + '" oninput="S.q=this.value;renderList()"></div>';
+  h += '<div class="seg">' + seg("setView('item')", S.view === 'item', '품목별') + seg("setView('loc')", S.view === 'loc', '자리별') + '</div>';
+  if (S.view === 'item') {
+    h += '<div class="seg">' + seg("setKind('prod')", S.kind === 'prod', '제품', M.nProd + '개') + seg("setKind('etc')", S.kind === 'etc', '부자재·기타', M.nEtc + '개') +
+      seg("setKind('all')", S.kind === 'all', '전체', M.items.length + '개') + '</div>';
+  } else {
+    var row = M.rowOrder.indexOf(S.row) >= 0 ? S.row : M.rowOrder[0];
+    h += '<div class="seg rows">' + M.rowOrder.map(function (r) { return seg("setRow('" + esc(r) + "')", r === row, esc(r), M.rowCount[r] + '곳'); }).join('') + '</div>';
+  }
+  h += '<div id="list"></div>' + foot;
+  $('app').innerHTML = h;
+  renderList();
+  if (keep && $('q')) { var el = $('q'); el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {} }
+}
+
+// 품목 카드를 누르면 LOT·자리가 펼쳐짐
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest ? ev.target.closest('button.ih') : null;
+  if (!b || !b.getAttribute('data-code')) return;
+  var c = b.getAttribute('data-code');
+  S.open[c] = !S.open[c];
+  renderList();
+});
+// 다른 앱에 갔다가 돌아오면 (1분 넘었을 때) 새로 받음
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && S.pin && Date.now() - S.lastLoad > 60000) load();
+});
+
+// 저장해 둔 자료부터 보여 주고(끊겨도 보이게) 새로 받음. 처음이면 재고이동 화면이 저장해 둔 것을 빌려 씀
+(function () {
+  var c = lsJson(K.cache, null), o = c ? null : lsJson(K.old, null);
+  if (!c && o && o.stock) c = { at: o.at || '', stockTime: o.stockTime || '', stock: o.stock, items: o.items || [], moved: 0 };
+  if (c && c.stock) { S.data = c; try { S.M = build(c); } catch (e) { S.data = null; S.M = null; } }
+})();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(function () {});
+}
+render();
+load();
+</script>
+</body>
+</html>

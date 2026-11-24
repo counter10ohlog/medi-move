@@ -119,6 +119,10 @@
   .mix .exp { font-size:14px; padding:2px 8px; }
   .mix .mq { font-size:14px; font-weight:700; color:var(--ink2); margin-left:2px; }
   .mix .ms { margin-top:8px; font-size:14.5px; font-weight:700; }
+  .mix .nx { font-size:15px; font-weight:900; margin:3px 0 6px; }
+  .mix .nx0 { color:var(--red); }
+  .mix .nx0 span { font-size:13px; font-weight:700; color:var(--red-ink); }
+  .mix .nx1 { color:var(--ink); }
   .ok { background:var(--go-soft); color:var(--go-ink); border:1px solid var(--go-line); border-radius:12px; padding:12px 14px; margin:10px 0; font-weight:800; font-size:18px; }
   .muted, .sub { color:var(--mute); font-size:14px; }
   .card p.sub { font-weight:600; font-size:14px; color:var(--mute); }
@@ -182,7 +186,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-24b';
+var VERSION = '2026-11-24c';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -420,6 +424,24 @@ function lotMix(full, code) {
   other.sort(function (a, b) { return (a.exp || '9999') < (b.exp || '9999') ? -1 : 1; });
   return { mine: ml.map(function (k) { return mine[k]; }), other: other };
 }
+// 11/24 김문수 님 "그 경고 메시지 나올 때 '다음 재고 없음'도" → 피킹존 LOT이 Bulk에 더 있는지(다음 재고)
+// Bulk 자리(재고 현황) 가운데 그 품목·LOT이 있는 곳. 지금 자리와 오늘 휴대폰으로 '재고X(다 꺼냄)' 한 자리는 뺌
+function bulkNext(code, lot, exceptFull) {
+  var gone = {}, by = {}, total = 0;
+  liveLog().forEach(function (r) { if (r.kind === 'pick' && r.empty) gone[r.loc] = true; });
+  S.data.stock.forEach(function (r) {
+    if (r.code !== code || r.lot !== lot || r.loc === exceptFull || gone[r.loc] || !parseLoc(r.loc) || !(r.avail > 0)) return;
+    by[r.loc] = (by[r.loc] || 0) + r.avail; total += r.avail;
+  });
+  var locs = Object.keys(by).sort().map(function (l) { return { loc: l, qty: by[l] }; });
+  return { locs: locs, total: total };
+}
+function nextLine(code, lot, exceptFull) {
+  var x = bulkNext(code, lot, exceptFull);
+  if (!x.locs.length) return '<div class="nx nx0">다음 재고 없음 <span>(Bulk에 이 LOT 없음)</span></div>';
+  var s = x.locs.slice(0, 3).map(function (c) { return esc(shortOf(c.loc)) + ' ' + n(c.qty) + '개'; }).join(' · ');
+  return '<div class="nx nx1">다음 재고 있음: ' + s + (x.locs.length > 3 ? ' 외 ' + (x.locs.length - 3) + '곳' : '') + '</div>';
+}
 function mixWarn(full, code, withName) {
   var m = lotMix(full, code);
   if (!m) return '';
@@ -427,7 +449,8 @@ function mixWarn(full, code, withName) {
     (withName ? '<div class="mn">' + esc(itemOf(code).name) + '</div>' : '') +
     '<div class="mr"><span class="mk">피킹존에 있는 것</span>';
   m.other.forEach(function (e) {
-    h += lotChips(e.lot, e.exp) + '<span class="mq">' + (e.qty ? n(e.qty) + '개' : '') + (e.today ? (e.qty ? ' · ' : '') + '오늘 꺼냄' : '') + '</span>';
+    h += lotChips(e.lot, e.exp) + '<span class="mq">' + (e.qty ? n(e.qty) + '개' : '') + (e.today ? (e.qty ? ' · ' : '') + '오늘 꺼냄' : '') + '</span>' +
+      nextLine(code, e.lot, full);
   });
   h += '</div><div class="mr"><span class="mk">지금 꺼내는 것 (' + esc(shortOf(full)) + ')</span>';
   m.mine.forEach(function (r) { h += lotChips(r.lot, r.exp); });

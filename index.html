@@ -182,7 +182,7 @@
  * 자리 QR(이 주소 ?loc=M1-09) → 그 자리에서 한 일 [저장] → 휴대폰에 먼저 적고(보관함) → 구글 웹앱(config.js apiUrl)으로 보냄.
  * 인터넷이 끊기면 보관함에 남았다가 연결되면 다시 보냄(3초 → 최대 30초). 같은 기록 ID는 구글에서 한 번만 들어감.
  * 받은 자료(재고·품목·오늘 기록)도 휴대폰에 저장해 두어, 끊긴 채 열어도 보인다. 화면 파일은 sw.js가 저장해 둔다. */
-var VERSION = '2026-11-24a';
+var VERSION = '2026-11-24b';
 var CFG = window.MEDI_MOVE_CONFIG || {};
 var ROWS = ['I', 'J', 'K', 'L', 'M', 'N', 'E'];
 var K = { worker: 'mm_worker', pin: 'mm_pin', outbox: 'mm_outbox', cache: 'mm_cache', gone: 'mm_cancelled', pend: 'mm_pending_move' };
@@ -400,9 +400,16 @@ function pickLots(code) {
   });
   return o;
 }
+// 같은 날 김문수 님 "부자재 등은 괜찮은 것 같아, 제품들만" → 제품(2WL 건기식·2MP 유러피안이스카·이너와이)만, 2WL이어도 보틀·파우치 등은 뺌
+// (업무허브 move_calc.is_product·location-rules.json 부자재_상품명과 같게 둘 것)
+var SUPPLY_WORDS = ['보틀', '파우치', '쇼핑백', '선물박스', '리플릿', '리플렛', '안내지', '스티커', '봉투'];
+function isProduct(code) {
+  var nm = itemOf(code).name || '';
+  return /^(2WL|2MP)/.test(code) && !SUPPLY_WORDS.some(function (w) { return nm.indexOf(w) >= 0; });
+}
 // 이 Bulk 자리에서 꺼내는 LOT과 다른 LOT이 피킹존에 있으면 {mine, other}, 없거나 모르면 null
 function lotMix(full, code) {
-  if (!S.data || !full || !code) return null;
+  if (!S.data || !full || !code || !isProduct(code)) return null;
   var mine = {};
   stockAt(full).forEach(function (r) { if (r.code === code && !mine[r.lot]) mine[r.lot] = r; });
   var ml = Object.keys(mine);

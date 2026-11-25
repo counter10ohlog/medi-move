@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>메디포스트 자동화 (데이터)</title>
 <style>
-  /* 2026-11-13 휴대폰 원격 조종 — 와이파이 없이 데이터로 (구글 중계). 화면 판: ctl-2026-11-24a (오늘 출고 현황판)
+  /* 2026-11-13 휴대폰 원격 조종 — 와이파이 없이 데이터로 (구글 중계). 화면 판: ctl-2026-11-25a (현황판 퀵·픽업 차수 = 운송장 없음 표기) · 앞 판 ctl-2026-11-24a (오늘 출고 현황판)
      휴대폰 → 구글 웹앱(Code.gs v6 ctl_) → 사무실 PC(업무허브 mobile_gate.py)가 몇 초마다 받아서 실행
      밝은 바탕·흰 카드 (사장님: 까만 배경 싫어함) */
   :root { --bg:#f4f7f6; --card:#ffffff; --ink:#222826; --ink2:#55605c; --line:#dfe6e3; --g:#1f8a5b; --g-soft:#e6f4ed;
@@ -173,15 +173,16 @@ function render(r) {
   if (hasB) {
     const T = B.total || {}, C = B.check, n = v => Number(v ?? 0).toLocaleString("ko-KR");
     $("#board").innerHTML = `<div class="bk">
-        <div><div class="v">${n(T.boxes)}</div><div class="l">택배 박스(송장)${T.boxes_unknown ? ` · 모름 ${n(T.boxes_unknown)}차수` : ""}</div></div>
+        <div><div class="v">${n(T.boxes)}</div><div class="l">택배 박스(송장)${T.boxes_unknown ? ` · 모름 ${n(T.boxes_unknown)}차수` : ""}${T.quick ? ` · 퀵 ${n(T.quick)}차수 따로` : ""}</div></div>
         <div><div class="v">${n(T.orders)}</div><div class="l">주문 · ${n(T.qty)}개</div></div>
         <div><div class="v">${n(T.done)}<span style="font-size:14px"> / ${n(T.rounds)}</span></div><div class="l">끝난 차수</div></div></div>`
       + B.rounds.slice().reverse().map(x => `<div class="row"><div><b>${esc(x.n)}차</b> <span class="muted">${esc(x.kind || "")} · ${esc(x.time || "")}</span>
           <div><span class="dots">${(x.steps || []).map(v => v === 2 ? "●" : v === 1 ? "<i>–</i>" : "<i>○</i>").join("")}</span>
             <span class="badge ${x.done ? "ok" : "warn"}">${x.done ? "다 끝남" : "다음: " + esc(x.next)}</span></div>
           ${(x.stops || []).map(t => `<div class="muted" style="color:var(${String(t).startsWith("⚠") ? "--red" : "--amber"})">${esc(t)}</div>`).join("")}</div>
-        <div style="white-space:nowrap;text-align:right"><b style="font-size:18px">${x.boxes == null ? "?" : n(x.boxes)}</b>장<div class="muted">${n(x.orders)}건 · ${n(x.qty)}개</div></div></div>`).join("")
+        <div style="white-space:nowrap;text-align:right">${x.quick ? `<b style="font-size:18px">${esc(x.quick)}</b><div class="muted">운송장 없음</div>` : `<b style="font-size:18px">${x.boxes == null ? "?" : n(x.boxes)}</b>장`}<div class="muted">${n(x.orders)}건 · ${n(x.qty)}개</div></div></div>`).join("")
       + `<div class="muted" style="margin-top:8px">● 발주 등록 → 운송장 배정 → 운송장 엑셀 → 우체국 등록 → 배송확정 → 거래명세서</div>`
+      + (B.rounds.some(x => x.quick) ? `<div class="muted">● 퀵·픽업(운송장 없음): 발주 등록 → 배정 → 피킹접수 → 배송확정</div>` : "")
       + (C ? `<div class="badge ${C.verdict === "ok" ? "ok" : "warn"}" style="margin-top:8px">${esc(C.at)} 출고 확인: ${esc(C.headline)}</div>` : "")
       + (T.auto ? `<div class="muted" style="margin-top:4px">자동화 ${n(T.auto)}차수 중 멈춤 없이 ${n(T.clean)}차수</div>` : "");
   } else { $("#board").innerHTML = ""; }

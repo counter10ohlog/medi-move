@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>메디포스트 자동화 (데이터)</title>
 <style>
-  /* 2026-11-13 휴대폰 원격 조종 — 와이파이 없이 데이터로 (구글 중계). 화면 판: ctl-2026-11-25a (현황판 퀵·픽업 차수 = 운송장 없음 표기) · 앞 판 ctl-2026-11-24a (오늘 출고 현황판)
+  /* 2026-11-13 휴대폰 원격 조종 — 와이파이 없이 데이터로 (구글 중계). 화면 판: ctl-2026-11-26a (안내창 부족 품목 줄 빨간 굵은 글씨 — PC 안내창과 같게) · 앞 판 ctl-2026-11-25a (현황판 퀵·픽업 차수 = 운송장 없음 표기) · ctl-2026-11-24a (오늘 출고 현황판)
      휴대폰 → 구글 웹앱(Code.gs v6 ctl_) → 사무실 PC(업무허브 mobile_gate.py)가 몇 초마다 받아서 실행
      밝은 바탕·흰 카드 (사장님: 까만 배경 싫어함) */
   :root { --bg:#f4f7f6; --card:#ffffff; --ink:#222826; --ink2:#55605c; --line:#dfe6e3; --g:#1f8a5b; --g-soft:#e6f4ed;
@@ -30,6 +30,7 @@
   .grid { display:grid; grid-template-columns:1fr; gap:8px; }
   .q { border:2px solid #e8b04a; background:var(--amber-soft); }
   .q .text { white-space:pre-wrap; background:#fff; border-radius:10px; padding:12px; margin:8px 0 12px; font-size:15px; max-height:50vh; overflow:auto; }
+  .q .text .hl { color:#c62828; font-weight:800; font-size:16.5px; }   /* 2026-11-26 부족 품목 줄 (PC 안내창 remote-dialog.ps1과 같은 기준) */
   .q .btns { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .q .btns.one { grid-template-columns:1fr; }
   .log { font-size:13px; color:var(--ink2); white-space:pre-wrap; word-break:break-all; border-top:1px dashed var(--line); padding-top:6px; margin-top:6px; }
@@ -102,6 +103,9 @@
 <script>
 const CFG = window.MEDI_MOVE_CONFIG || {};
 const $ = s => document.querySelector(s);
+// 2026-11-26 김문수 님 "재고 모자라서 품목 보여 줄 때 잘 보이게" → "휴대폰도 해 줘": '▶ …'·'• … 필요 n개'·'부족 n품목' 줄 강조 (PC 안내창과 같은 기준)
+const HL_LINE = /^\s*(▶.*|•\s.*(필요\s*\d+개|부족).*|부족 \d+품목.*)$/;
+function qTextHtml(t) { return String(t).split("\n").map(l => HL_LINE.test(l) ? `<span class="hl">${esc(l)}</span>` : esc(l)).join("\n"); }
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const SKEY = "medi_ctl_sess";
 let busy = false, lastQ = "", timer = null, toolsDrawn = false;
@@ -157,7 +161,7 @@ function render(r) {
     if (q.id !== lastQ) { lastQ = q.id; if (navigator.vibrate) navigator.vibrate(200); }
     $("#qTitle").textContent = q.title || "PC에 뜬 안내창";
     $("#qTime").textContent = (q.time || "").slice(11, 19) + " · PC에서 눌러도 돼요";
-    $("#qText").textContent = q.text || "";
+    $("#qText").innerHTML = qTextHtml(q.text || "");   // 2026-11-26 부족 품목 줄은 빨간 굵은 글씨
     $("#qBtns").className = "btns" + (q.yesno ? "" : " one");
     $("#qBtns").innerHTML = q.yesno ? `<button class="pri" data-a="yes">예</button><button data-a="no">아니요</button>` : `<button class="pri" data-a="yes">확인</button>`;
     $("#qBtns").querySelectorAll("button").forEach(x => x.onclick = () => answer(q.id, x.dataset.a, x));
